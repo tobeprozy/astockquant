@@ -5,7 +5,7 @@ import pandas as pd
 import tushare as ts
 import backtrader as bt  
 # 如果要使用旧版tushare，需要指定pip包
-# pip install pandas==2.0.0 -i https://pypi.tuna.tsinghua.edu.cn/simple
+# pip install numpy==1.23.5 pandas==1.5.3 -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 def get_data(code, start="2024-08-01", end="2024-09-30"):
     df = ts.get_k_data(code, autype="qfq", start=start, end=end)
