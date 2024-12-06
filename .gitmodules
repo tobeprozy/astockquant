@@ -1,0 +1,3 @@
+[submodule "qbot"]
+	path = qbot
+	url = https://github.com/UFund-Me/Qbot.git
