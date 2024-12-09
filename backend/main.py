@@ -16,11 +16,11 @@ import pyfolio as pf
 import matplotlib.pyplot as plt
 import backtrader as bt  # 升级到最新版，pip install matplotlib==3.2.2
 
-from strategies.strategy import Strategy1,SmaCross,PairTradingStrategy
+from strategies.strategy import Strategy1,SmaCross,PairTradingStrategy,Strategy_MACD
 
 from backEngine.backEngine import BackEngine,MultiBackEngine
 
-if __name__ ==  "__main__":
+if __name__ ==  "__main4__":
 
 
     stock_index = '512200'
@@ -34,11 +34,11 @@ if __name__ ==  "__main__":
     engine.plot_results()
 
 
-if __name__ ==  "__main3__":
+if __name__ ==  "__main__":
 
     stock_index = '512200'
 
-    s_date = (datetime.datetime.now() - datetime.timedelta(days=1000)).strftime('%Y%m%d')
+    s_date = (datetime.datetime.now() - datetime.timedelta(days=100)).strftime('%Y%m%d')
     e_date = datetime.datetime.now().strftime('%Y%m%d')
 
     engine = BackEngine(stock_index, s_date, e_date, Strategy1)

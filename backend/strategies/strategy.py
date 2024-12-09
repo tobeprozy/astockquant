@@ -2,31 +2,29 @@
 import backtrader as bt  # 升级到最新版，pip install matplotlib==3.2.2
 
 class StrategyBase(bt.Strategy):
-
     def notify_order(self, order):
-        def notify_order(self, order):
-            # 未被处理的订单
-            if order.status in [order.Submitted, order.Accepted]:
-                return
-            # 已经处理的订单
-            if order.status in [order.Completed, order.Canceled, order.Margin]:
-                if order.isbuy():
-                    self.log(
-                        'BUY EXECUTED, ref:%.0f，Price: %.2f, Cost: %.2f, Comm %.2f, Size: %.2f, Stock: %s' %
-                        (order.ref,  # 订单编号
-                         order.executed.price,  # 成交价
-                         order.executed.value,  # 成交额
-                         order.executed.comm,  # 佣金
-                         order.executed.size,  # 成交量
-                         order.data._name))  # 股票名称
-                else:  # Sell
-                    self.log('SELL EXECUTED, ref:%.0f, Price: %.2f, Cost: %.2f, Comm %.2f, Size: %.2f, Stock: %s' %
-                             (order.ref,
-                              order.executed.price,
-                              order.executed.value,
-                              order.executed.comm,
-                              order.executed.size,
-                              order.data._name))
+        # 未被处理的订单
+        if order.status in [order.Submitted, order.Accepted]:
+            return
+        # 已经处理的订单
+        if order.status in [order.Completed, order.Canceled, order.Margin]:
+            if order.isbuy():
+                self.log(
+                    'BUY EXECUTED, ref:%.0f，Price: %.2f, Cost: %.2f, Comm %.2f, Size: %.2f, Stock: %s' %
+                    (order.ref,  # 订单编号
+                        order.executed.price,  # 成交价
+                        order.executed.value,  # 成交额
+                        order.executed.comm,  # 佣金
+                        order.executed.size,  # 成交量
+                        order.data._name))  # 股票名称
+            else:  # Sell
+                self.log('SELL EXECUTED, ref:%.0f, Price: %.2f, Cost: %.2f, Comm %.2f, Size: %.2f, Stock: %s' %
+                            (order.ref,
+                            order.executed.price,
+                            order.executed.value,
+                            order.executed.comm,
+                            order.executed.size,
+                            order.data._name))
 
 class MyStrategy(StrategyBase):
     # 定义我们自己写的这个 MyStrategy 类的专有属性
@@ -44,8 +42,11 @@ class Strategy1(StrategyBase):
     """
     主策略程序
     """
-    params = (("maperiod", 5),)  # 全局设定交易策略的参数
-
+    params = (
+        ('printlog', True),
+        ("maperiod", 5),
+    )
+    
     def __init__(self):
         """
         初始化函数
@@ -59,6 +60,13 @@ class Strategy1(StrategyBase):
         self.sma = bt.indicators.SimpleMovingAverage(
             self.datas[0], period=self.params.maperiod
         )
+    def log(self, txt, dt=None, doprint=False):
+        """
+        记录交易策略的执行过程
+        """
+        if self.params.printlog:
+            dt = dt or self.datas[0].datetime.date(0)
+            print("%s, %s" % (dt.isoformat(), txt))
 
     def next(self):
         """
@@ -264,3 +272,140 @@ if __name__ ==  "__main__":
     print("transactions:", transactions)
     print("gross_lev:", gross_lev)
     
+
+class Strategy_MACD(StrategyBase):
+    '''#平滑异同移动平均线MACD
+        DIF(蓝线): 计算12天平均和26天平均的差，公式：EMA(C,12)-EMA(c,26)
+       Signal(DEM或DEA或MACD) (红线): 计算macd9天均值，公式：Signal(DEM或DEA或MACD)：EMA(MACD,9)
+        Histogram (柱): 计算macd与signal的差值，公式：Histogram：MACD-Signal
+
+        period_me1=12
+        period_me2=26
+        period_signal=9
+        
+        macd = ema(data, me1_period) - ema(data, me2_period)
+        signal = ema(macd, signal_period)
+        histo = macd - signal
+    '''
+    
+    params = (
+        ('printlog', True),
+        ('ema_short', 8),
+        ('ema_long', 21),
+        ('macd_period', 5),
+        ('sma_short', 21),
+        ('sma_long', 55),
+    )
+    
+    
+    def log(self, txt, dt=None, doprint=False):
+        ''' Logging function fot this strategy'''
+        if self.params.printlog or doprint:
+            dt = dt or self.datas[0].datetime.date(0)
+            print('%s: %s' % (dt.isoformat(), txt))
+            with open('log.txt', 'a') as file:
+                file.write('%s: %s \n' % (dt.isoformat(), txt))
+        
+    
+    def __init__(self):
+        
+        # Keep a reference to the 'close' line in the data[0] dataseries
+        self.dataclose = self.datas[0].close
+
+        # Add MACD indicator
+        # self.macdhisto =  bt.talib.MACD(self.datas[0])
+        # bt.talib.MACD.macdhist=2*bt.talib.MACD.macdhist
+        # self.MACD = bt.talib.MACD
+        self.MACD = bt.talib.MACDFIX(self.datas[0], fastperiod=self.params.ema_short, slowperiod=self.params.ema_long, signalperiod=self.params.macd_period)
+        self.dif = self.MACD.macd
+        self.dea = self.MACD.macdsignal
+        self.signal = self.MACD.macdhist
+
+        # self.macdhisto =  bt.indicators.MACDHisto(self.datas[0],self.params.ema_short, self.params.ema_long, self.params.macd_period)
+        # 双均线
+        self.sma1 = bt.ind.SMA(period=self.params.sma_short)  # 短期均线
+        self.sma2 = bt.ind.SMA(period=self.params.sma_long)  # 长期均线
+        # self.crossover = bt.ind.CrossOver(sma1, sma2)  # 交叉信号
+        self.crossover55 = bt.ind.CrossOver(self.datas[0].high, self.sma2)   # 价格穿过55日线
+        self.crossover21 = bt.ind.CrossOver(self.datas[0].low, self.sma1)  # 价格穿过21日线
+        self.order = None
+        # bt.indicators.BollingerBands(self.datas[0], period=25)
+
+        
+    def notify_order(self, order):
+        if order.status in [order.Submitted, order.Accepted]:
+            # Buy/Sell order submitted/accepted to/by broker - Nothing to do
+            return
+
+        # Check if an order has been completed
+        # Attention: broker could reject order if not enough cash
+        if order.status in [order.Completed]:
+            if order.isbuy():
+                print("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+                self.log('BUY EXECUTED, Price: %.2f, Lot:%i, Cash: %i, Value: %i' %
+                         (order.executed.price,
+                          order.executed.size,
+                          self.broker.get_cash(),
+                          self.broker.get_value()))
+            else:  # Sell
+                print("SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS")
+                self.log('SELL EXECUTED, Price: %.2f, Lot:%i, Cash: %i, Value: %i' %
+                        (order.executed.price,
+                          -order.executed.size,
+                          self.broker.get_cash(),
+                          self.broker.get_value()))
+
+        elif order.status in [order.Canceled, order.Margin, order.Rejected]:
+            self.log('Order Canceled/Margin/Rejected')
+
+        # Write down: no pending order
+        #self.order = None
+
+    def notify_trade(self, trade):
+        if not trade.isclosed:
+            return
+
+        self.log('OPERATION PROFIT, GROSS %.2f, NET %.2f' %
+                 (trade.pnl, trade.pnlcomm))
+    # def notify_trade(self, trade):
+    #     if trade.isclosed:
+    #         if trade.history[0].event == 'buy':
+    #             print('买入时间：{}, 买入价：{:.2f}, 买入数量：{}, 卖出时间：{}, 卖出价：{:.2f}, 盈亏：{:.2f}'.format(
+    #                 bt.num2date(
+    #                     trade.history[0].dt), trade.history[0].price, trade.history[0].size,
+    #                 bt.num2date(trade.history[-1].dt), trade.history[-1].price, trade.history[-1].price - trade.history[0].price))
+    #         else:
+    #             print('卖出时间：{}, 卖出价：{:.2f}, 卖出数量：{}, 买入时间：{}, 买入价：{:.2f}, 盈亏：{:.2f}'.format(
+    #                 bt.num2date(
+    #                     trade.history[0].dt), trade.history[0].price, trade.history[0].size,
+    #                 bt.num2date(trade.history[-1].dt), trade.history[-1].price, trade.history[0].price - trade.history[-1].price))
+        
+ 
+    def next(self):
+        
+        # Check if an order is pending ... if yes, we cannot send a 2nd one
+        #if self.order:
+        #    return
+           
+        # # MACD Buy Signal
+        # if self.macdhisto.histo[0] > 0 and self.macdhisto.histo[-1] < 0:
+        #     self.log('BUY CREATE, Price: %.2f, Lots: %i, Current Position: %i' % (self.dataclose[0], 
+        #                                                                                  100, self.getposition(self.data).size))
+        #     self.buy(size = 100)
+                   
+        # # MACD Sell Singal
+        # elif self.macdhisto.histo[0] < 0 and self.macdhisto.histo[-1] > 0:
+        #         if self.getposition(self.data).size > 0:
+        #             self.log('SELL CREATE (Close), Price: %.2f, Lots: %i' % (self.dataclose[0], 
+        #                                                                                     self.getposition(self.data).size))
+        #             self.close()
+        if not self.position:
+            if self.crossover55 > 0 and self.sma1[0] <self.sma2[0] :
+                self.buy(size=10000/self.dataclose-200)  # 买入
+        elif self.crossover21 < 0:
+            self.close()  # 卖出
+
+
+                    
+        # Keep track of the created order to avoid a 2nd order
+        #self.order = self.sell(size = self.getposition(data).size - opt_position)
