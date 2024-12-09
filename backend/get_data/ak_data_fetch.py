@@ -1,5 +1,7 @@
 import akshare as ak
 import json
+import akshare as ak
+
 class AkDataFetcher:
     def __init__(self, start_date, end_date, interval='1d'):
         """
@@ -65,8 +67,8 @@ class AkDataFetcher:
             raise ValueError("Unsupported interval for ETFs.")
 
 
-import akshare as ak
-import pandas as pd
+
+
 
 class FinancialDataFetcher:
     def __init__(self):
@@ -156,9 +158,6 @@ if __name__ == "__main__":
             
         else:
             break  # 到达第五个后停止循环
-
-
-
 
 
     # # 获取特定股票的所有历史信息

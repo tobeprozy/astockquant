@@ -11,8 +11,6 @@ import torch.nn as nn
 from tqdm import tqdm
 import torch.optim as optim
 
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, roc_curve, auc
-
 
 # 获取当前文件的目录
 cur_dir = os.path.dirname(os.path.abspath(__file__))
