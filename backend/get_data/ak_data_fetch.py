@@ -74,7 +74,42 @@ class FinancialDataFetcher:
     def __init__(self):
         self.stock_list = None
         self.fund_list = None
-    
+        self.fund_info=None
+        self.stock_info=None
+        
+       
+        # 定义一个字典，将中文列标题映射到英文列标题
+        self.columns_mapping1 = {
+            '日期': 'date',
+            '开盘': 'open',
+            '收盘': 'close',
+            '最高': 'high',
+            '最低': 'low',
+            '成交量': 'vol',
+            '成交额': 'Turnover',
+            '振幅': 'Amplitude',
+            '涨跌幅': 'ChangePercent',
+            '涨跌额': 'ChangeAmount',
+            '换手率': 'TurnoverRate'
+        }
+
+         # 定义一个字典，将中文列标题映射到英文列标题
+        self.columns_mapping2 = {
+            '日期': 'Date',
+            '开盘': 'Open',
+            '收盘': 'Close',
+            '最高': 'High',
+            '最低': 'Low',
+            '成交量': 'Volume',
+            '成交额': 'Turnover',
+            '振幅': 'Amplitude',
+            '涨跌幅': 'ChangePercent',
+            '涨跌额': 'ChangeAmount',
+            '换手率': 'TurnoverRate'
+        }
+
+
+
     def fetch_stock_list(self):
         """获取所有股票列表"""
         self.stock_list = ak.stock_zh_a_spot_em()
@@ -91,19 +126,19 @@ class FinancialDataFetcher:
         """根据股票代码获取股票信息，支持可选的日期范围"""
         if start_date is None or end_date is None:
             # 默认获取所有历史数据
-            stock_info = ak.stock_zh_a_hist(symbol=symbol, period="daily", start_date="19900101", end_date="20240101", adjust="qfq")
+            self.stock_info = ak.stock_zh_a_hist(symbol=symbol, period="daily", start_date="19900101", end_date="20240101", adjust="qfq")
         else:
-            stock_info = ak.stock_zh_a_hist(symbol=symbol, period="daily", start_date=start_date, end_date=end_date, adjust="qfq")
-        return stock_info
+            self.stock_info = ak.stock_zh_a_hist(symbol=symbol, period="daily", start_date=start_date, end_date=end_date, adjust="qfq")
+        return self.stock_info
     
     def fetch_fund_info(self, symbol, start_date=None, end_date=None):
         """根据基金代码获取基金信息，支持可选的日期范围"""
         if start_date is None or end_date is None:
             # 默认获取所有历史数据
-            fund_info = ak.fund_etf_hist_em(symbol=symbol, period="daily", start_date="19900101", end_date="20240101", adjust="qfq")
+            self.fund_info = ak.fund_etf_hist_em(symbol=symbol, period="daily", start_date="19900101", end_date="20240101", adjust="qfq")
         else:
-            fund_info = ak.fund_etf_hist_em(symbol=symbol, period="daily", start_date=start_date, end_date=end_date, adjust="qfq")
-        return fund_info
+            self.fund_info = ak.fund_etf_hist_em(symbol=symbol, period="daily", start_date=start_date, end_date=end_date, adjust="qfq")
+        return self.fund_info
     
     def filter_funds_by_name(self,df,name):
         filtered_df = df[df['基金简称'].str.contains(name, na=False)]
@@ -126,6 +161,16 @@ class FinancialDataFetcher:
         data = self.stock_list[['代码', '名称']].to_dict(orient='records')
         with open(name, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
+
+    def fund_rename(self,map=None):
+        if map is None:
+            map=self.columns_mapping1
+        
+        if self.fund_info is not None:
+            self.fund_info.rename(columns=map, inplace=True)
+        else:
+            print("fund_info is None")
+
 
 
 # 示例用法
