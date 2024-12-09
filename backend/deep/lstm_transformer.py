@@ -106,7 +106,10 @@ def train_val_test_split(X, y, train_ratio=0.7, val_ratio=0.15):
 
     return X_train, X_val, X_test, y_train, y_val, y_test
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 35607909919233883c751c8f36edad03046a2590
 # 定义 PyTorch 数据集类
 class TimeSeriesDataset(Dataset):
     def __init__(self, features, labels):
@@ -156,8 +159,12 @@ if __name__ ==  "__main__":
     df.fillna(method='bfill', inplace=True)
 
     # 选择特征和标签
+<<<<<<< HEAD
     # features = df[['open', 'high', 'low', 'vol', 'Turnover', 'Amplitude', 'ChangePercent', 'MA5', 'MA10', 'MA20', 'STOCH_SLOWK', 'STOCH_SLOWD', 'MACD', 'MACD_SIGNAL', 'MACD_HIST']]
     features = df[['open','close','high', 'low', 'vol', 'Turnover',  'MA5', 'MA10', 'MA20', 'MACD', 'MACD_SIGNAL', 'MACD_HIST']]
+=======
+    features = df[['open', 'high', 'low', 'vol', 'Turnover', 'Amplitude', 'ChangePercent', 'MA5', 'MA10', 'MA20', 'STOCH_SLOWK', 'STOCH_SLOWD', 'MACD', 'MACD_SIGNAL', 'MACD_HIST']]
+>>>>>>> 35607909919233883c751c8f36edad03046a2590
     # 计算明天的价格相对于今天的变化
     df['next_close'] = df['close'].shift(-1)  # 创建一个新列，其中包含下一天的收盘价
     df['is_up'] = (df['next_close'] > df['close']).astype(int)  # 如果下一天的收盘价高于今天，则标签为1
@@ -175,7 +182,11 @@ if __name__ ==  "__main__":
     val_dataset = TimeSeriesDataset(X_val, y_val)
     test_dataset = TimeSeriesDataset(X_test, y_test)
 
+<<<<<<< HEAD
     batch_size = 32
+=======
+    batch_size = 4
+>>>>>>> 35607909919233883c751c8f36edad03046a2590
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
@@ -188,13 +199,16 @@ if __name__ ==  "__main__":
     hidden_dim = 128  # LSTM 隐藏层维度
     transformer_nhead = 8  # Transformer 中的头数
     num_layers = 2  # LSTM 和 Transformer 的层数
+
     num_classes = 1  # 输出类别数，例如涨跌概率
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     model = LSTMTransformer(input_dim, hidden_dim, transformer_nhead, num_layers, num_classes)
     criterion = nn.BCELoss()
+
     optimizer = optim.Adam(model.parameters(), lr=0.0025)
+
 
     train_model(model, train_loader, val_loader, criterion, optimizer, num_epochs=100)
     
