@@ -10,7 +10,9 @@ if root not in sys.path:
 from get_data.ak_data_fetch import FinancialDataFetcher
 import pandas as pd
 import backtrader as bt
+import logging
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 class BackEngine:
     def __init__(self, stock_index, start_date, end_date, strategy):
         self.stock_index = stock_index
@@ -45,31 +47,30 @@ class BackEngine:
         data = bt.feeds.PandasData(dataname=self.fetch_data())
         self.setup_cerebro(data)
         # 打印初始资金
-        print('初始投资组合市值: %.2f' % self.cerebro.broker.getvalue())
+        logging.debug('初始投资组合市值: %.2f', self.cerebro.broker.getvalue())
         result = self.cerebro.run()
         # 打印回测完成后的资金
-        print('最终投资组合市值: %.2f' % self.cerebro.broker.getvalue())
-
+        logging.debug('最终投资组合市值: %.2f', self.cerebro.broker.getvalue())
         return result
 
     def print_results(self, result):
         strat = result[0]
-        print('Final Portfolio Value: %.2f' % self.cerebro.broker.getvalue())
-        print('SR:', strat.analyzers.SharpeRatio.get_analysis()['sharperatio'])
-        print('DW:', strat.analyzers.DW.get_analysis())
+        logging.debug('Final Portfolio Value: %.2f', self.cerebro.broker.getvalue())
+        logging.debug('SR: %s', strat.analyzers.SharpeRatio.get_analysis()['sharperatio'])
+        logging.debug('DW: %s', strat.analyzers.DW.get_analysis())
         port_value = self.cerebro.broker.getvalue()
         pnl = port_value - self.start_cash
-        print(f"初始资金: {self.start_cash}\n回测期间：{self.start_date}:{self.end_date}")
-        print(f"总资金: {round(port_value, 2)}")
-        print(f"净收益: {round(pnl, 2)}")
+        logging.debug("初始资金: %s", self.start_cash)
+        logging.debug("回测期间：%s:%s", self.start_date, self.end_date)
+        logging.info("总资金: %s", round(port_value, 2))
+        logging.info("净收益: %s", round(pnl, 2))
 
- 
         pyfoliozer = strat.analyzers.getbyname('pyfolio')
         returns, positions, transactions, gross_lev = pyfoliozer.get_pf_items()
-        print("returns:", returns)
-        print("positions:", positions)
-        print("transactions:", transactions)
-        print("gross_lev:", gross_lev)
+        logging.debug("returns: %s", returns)
+        logging.debug("positions: %s", positions)
+        logging.debug("transactions: %s", transactions)
+        logging.debug("gross_lev: %s", gross_lev)
 
     def plot_results(self):
         self.cerebro.plot()
