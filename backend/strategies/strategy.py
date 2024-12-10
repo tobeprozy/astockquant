@@ -409,3 +409,354 @@ class Strategy_MACD(StrategyBase):
                     
         # Keep track of the created order to avoid a 2nd order
         #self.order = self.sell(size = self.getposition(data).size - opt_position)
+        
+        
+class TurtleStrategy(bt.Strategy):
+    #默认参数
+    params = (
+        ('H_period', 20),   # 唐奇安通道上轨周期
+        ('L_period', 10),   # 唐奇安通道下轨周期
+        ('ATRPeriod', 14),  # 平均真实波幅ATR周期
+    )
+
+    #交易记录日志（默认打印结果）
+    def log(self, txt, dt=None, doprint=False):
+        if doprint:
+            dt = dt or self.datetime.date(0)
+            print(f'{dt.isoformat()},{txt}')
+
+    def __init__(self):
+        # 初始化
+        self.order = None  # 未决订单
+        self.buyprice = 0  # 买单执行价格
+        self.buycomm = 0  # 订单执行佣金
+        self.buy_size = 0  # 买单数量
+        self.buy_count = 0  # 买入次数计数
+
+        # 海龟交易法则中的唐奇安通道和平均真实波幅ATR
+        self.H_line = bt.indicators.Highest(
+            self.data.high(-1), period=self.p.H_period)
+        self.L_line = bt.indicators.Lowest(
+            self.data.low(-1), period=self.p.L_period)
+        self.ATR = bt.indicators.AverageTrueRange(
+            self.data, period=self.p.ATRPeriod)
+
+        # 价格与上下轨线的交叉
+        self.buy_signal = bt.ind.CrossOver(self.data.close(0), self.H_line)
+        self.sell_signal = bt.ind.CrossDown(self.data.close(0), self.L_line)
+
+    def next(self):
+        if self.order:
+            return
+
+        #入场：价格突破上轨线且空仓时
+        if self.buy_signal and self.buy_count == 0:
+             # 计算买入数量
+            self.buy_size = self.broker.getvalue() * 0.01 / self.ATR 
+            self.buy_size = int(self.buy_size / 100) * 100 
+
+            self.buy_count += 1  # 买入次数计数
+            self.log('创建买单')
+            self.order = self.buy(size=self.buy_size)
+
+        #加仓：价格上涨了买入价的0.5的ATR且加仓次数少于3次（含）
+        elif self.data.close > self.buyprice + 0.5 * self.ATR[0] \
+                and self.buy_count > 0 and self.buy_count <= 4:
+             # 计算买入数量
+            self.buy_size = self.broker.getvalue() * 0.01 / self.ATR 
+            self.buy_size = int(self.buy_size / 100) * 100  
+
+            self.log('创建买单')
+            self.order = self.buy(size=self.buy_size)
+            self.buy_count += 1  # 买入次数计数
+
+        #离场：价格跌破下轨线且持仓时
+        elif self.position:
+            if self.sell_signal or self.data.close < (
+                    self.buyprice - 2 * self.ATR[0]):
+                self.log('创建卖单')
+                self.order = self.close()  # 清仓
+                self.buy_count = 0
+
+    #记录交易执行情况（默认不输出结果）
+    def notify_order(self, order):
+        # 如果order为submitted/accepted,返回
+        if order.status in [order.Submitted, order.Accepted]:
+            return
+
+        # 如果order为buy/sell executed,报告价格结果
+        if order.status in [order.Completed]:
+            if order.isbuy():
+                self.log(f'买入:价格:{order.executed.price},\
+                成本:{order.executed.value},\
+                手续费:{order.executed.comm}')
+
+                self.buyprice = order.executed.price
+                self.buycomm = order.executed.comm
+            else:
+                self.log(f'卖出:价格：{order.executed.price},\
+                成本: {order.executed.value},\
+                手续费{order.executed.comm}')
+
+        # 如果指令取消/交易失败, 报告结果
+        elif order.status in [order.Canceled, order.Margin, order.Rejected]:
+            self.log('交易失败%s' % order.getstatusname())
+        self.order = None
+
+    #记录交易收益情况（可省略，默认不输出结果）
+    def notify_trade(self, trade):
+        if not trade.isclosed:
+            return
+        self.log(f'策略收益：\n毛收益 {trade.pnl:.2f}, 净收益 {trade.pnlcomm:.2f}')
+
+    def stop(self):
+        self.log(
+            f'(组合线：{self.p.H_period},{self.p.L_period})；\
+        期末总资金: {self.broker.getvalue():.2f}',
+            doprint=True)
+        
+        
+# 定义Observer
+class OrderObserver(bt.observer.Observer):
+    lines = ('created', 'expired',)
+    # 做图参数设置
+    plotinfo = dict(plot=True, subplot=True, plotlinelabels=True)
+    # 创建工单 * 标识，过期工单 方块 标识
+    plotlines = dict(
+        created=dict(marker='*', markersize=8.0, color='lime', fillstyle='full'),
+        expired=dict(marker='s', markersize=8.0, color='red', fillstyle='full')
+    )
+
+    # 处理 Lines
+    def next(self):
+        for order in self._owner._orderspending:
+            if order.data is not self.data:
+                continue
+
+            if not order.isbuy():
+                continue
+
+            # Only interested in "buy" orders, because the sell orders
+            # in the strategy are Market orders and will be immediately
+            # executed
+
+            if order.status in [bt.Order.Accepted, bt.Order.Submitted]:
+                self.lines.created[0] = order.created.price
+
+            elif order.status in [bt.Order.Expired]:
+                self.lines.expired[0] = order.created.price
+
+# 定义策略
+class MACD_KDJStrategy(bt.Strategy):
+    # 策略参数
+    params = (
+        ('highperiod', 9),
+        ('lowperiod', 9),
+        ('kperiod', 3),
+        ('dperiod', 3),
+        ('me1period', 12),
+        ('me2period', 26),
+        ('signalperiod', 9),
+        ('limitperc', 1.0), # 限价比例 ，下跌1个百分点才买入，目的可以展示Observer的过期单
+        ('valid', 7), # 限价周期
+        ('print', False),
+        ('counter', 0),  # 计数器
+    )
+
+    def log(self, txt, dt=None):
+        """ Logging function fot this strategy"""
+        dt = dt or self.datas[0].datetime.date(0)
+        if self.params.print:
+            print("%s, %s" % (dt.isoformat(), txt))
+
+    def __init__(self):
+        # 初始化全局变量，备用
+        self.dataclose = self.datas[0].close
+        self.dataopen = self.datas[0].open
+        self.datahigh = self.datas[0].high
+        self.datalow = self.datas[0].low
+        self.volume = self.datas[0].volume
+
+        self.order = None
+        self.buyprice = None
+        self.buycomm = None
+
+        # N个交易日内最高价
+        self.highest = bt.indicators.Highest(self.data.high, period=self.p.highperiod)
+        # N个交易日内最低价
+        self.lowest = bt.indicators.Lowest(self.data.low, period=self.p.lowperiod)
+
+        # 计算rsv值 RSV=(CLOSE- LOW) / (HIGH-LOW) * 100
+        # 如果被除数0 ，为None
+        self.rsv = 100 * bt.DivByZero(
+            self.data_close - self.lowest, self.highest - self.lowest, zero=None
+        )
+
+        # 计算rsv的N个周期加权平均值，即K值
+        self.K = bt.indicators.EMA(self.rsv, period=self.p.kperiod, plot=False)
+        # D值=K值 的N个周期加权平均值
+        self.D = bt.indicators.EMA(self.K, period=self.p.dperiod, plot=False)
+        # J=3*K-2*D
+        self.J = 3 * self.K - 2 * self.D
+
+        # MACD策略参数
+        me1 = bt.indicators.EMA(self.data, period=self.p.me1period, plot=True)
+        me2 = bt.indicators.EMA(self.data, period=self.p.me2period, plot=True)
+
+        self.macd = me1 - me2
+        self.signal = bt.indicators.EMA(self.macd, period=self.p.signalperiod)
+        bt.indicators.MACDHisto(self.data)
+
+    # 订单通知处理
+    def notify_order(self, order):
+        if order.status in [order.Submitted, order.Accepted]:
+            return
+        if order.status in [order.Completed]:
+            if order.isbuy():
+                self.log(
+                    "BUY EXECUTED, Price: %.2f, Cost: %.2f, Comm %.2f"
+                    % (order.executed.price, order.executed.value, order.executed.comm)
+                )
+
+                self.buyprice = order.executed.price
+                self.buycomm = order.executed.comm
+                self.bar_executed_close = self.dataclose[0]
+            else:
+                self.log(
+                    "SELL EXECUTED, Price: %.2f, Cost: %.2f, Comm %.2f"
+                    % (order.executed.price, order.executed.value, order.executed.comm)
+                )
+            self.bar_executed = len(self)
+
+        elif order.status in [order.Canceled, order.Margin, order.Rejected]:
+            self.log("Order Canceled/Margin/Rejected")
+
+        self.order = None
+
+    # 交易通知处理
+    def notify_trade(self, trade):
+        if not trade.isclosed:
+            return
+
+        self.log("OPERATION PROFIT, GROSS %.2f, NET %.2f" % (trade.pnl, trade.pnlcomm))
+
+    # 策略执行
+    def next(self):
+        self.log("Close, %.2f" % self.dataclose[0])
+        if self.order:
+            return
+
+        # 空仓中，开仓买入
+        if not self.position:
+            # 买入基于MACD策略
+            condition1 = self.macd[-1] - self.signal[-1] # 昨天低于signal
+            condition2 = self.macd[0] - self.signal[0] # 今天高于signal
+            # 买入基于KDJ策略 K值大于D值，K线向上突破D线时，为买进信号。下跌趋势中，K值小于D值，K线向下跌破D线时，为卖出信号。
+            condition3 = self.K[-1] - self.D[-1] # 昨天J低于D
+            condition4 = self.K[0] - self.D[0]   # 今天J高于D
+
+            if condition1 < 0 and condition2 > 0 and condition3 < 0 and condition4 > 0 :
+                self.log('BUY CREATE, %.2f' % self.dataclose[0])
+
+                plimit = self.data.close[0] * (1.0 - self.p.limitperc / 100.0)
+                valid = self.data.datetime.date(0) + datetime.timedelta(days=self.p.valid)
+                self.log('BUY CREATE, %.2f' % plimit)
+                # 限价购买
+                self.buy(exectype=bt.Order.Limit, price=plimit, valid=valid)
+
+
+        else:
+            # 卖出基于MACD策略
+            condition1 = self.macd[-1] - self.signal[-1]
+            condition2 = self.macd[0] - self.signal[0]
+            # 卖出基于KDJ策略
+            condition3 = self.K[-1] - self.D[-1]
+            condition4 = self.D[0] - self.D[0]
+
+            if condition1 > 0 and condition2 < 0 and (condition3 > 0 or condition4 < 0):
+                self.log("SELL CREATE, %.2f" % self.dataclose[0])
+                self.order = self.sell()
+
+    def start(self):
+        # 从0 开始
+        # self.params.counter += 1
+        self.log('Strategy start %s' % self.params.counter)
+
+    def nextstart(self):
+        self.params.counter += 1
+        self.log('Strategy nextstart %s' % self.params.counter)
+
+    def prenext(self):
+        self.params.counter += 1
+        self.log('Strategy prenext  %s' % self.params.counter)
+
+    def stop(self):
+        self.params.counter += 1
+        self.log('Strategy stop  %s' % self.params.counter)
+        self.log('Ending Value %.2f' % ( self.broker.getvalue()))
+
+    # 例子，没地方放，先当着
+    # if __name__ == "__main__":
+    #     tframes = dict(
+    #         days=bt.TimeFrame.Days,
+    #         weeks=bt.TimeFrame.Weeks,
+    #         months=bt.TimeFrame.Months,
+    #         years=bt.TimeFrame.Years)
+
+    #     #1.实例初始化
+    #     cerebro = bt.Cerebro()
+
+    #     # 2.加载数据 Data feeds
+    #     # 加载数据到模型中，由dataframe 到 Lines 数据类型，查询10年数据到dataframe
+    #     stock_df = common.get_data('000858.SZ','2010-01-01','2021-01-01')
+    #     # 加载5年数据进行分析
+    #     start_date = datetime.datetime(2016, 1, 1)  # 回测开始时间
+    #     end_date = datetime.datetime(2020, 12, 31)  # 回测结束时间
+    #     # bt数据转换
+    #     data = bt.feeds.PandasData(dataname=stock_df, fromdate=start_date, todate=end_date)
+    #     # bt加载数据
+    #     cerebro.adddata(data)
+
+    #     #3.加载策略 Strategy
+    #     cerebro.addstrategy(MACD_KDJStrategy)
+
+    #     #4.加载分析器 Analyzers
+    #     cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='mysharpe')
+    #     cerebro.addanalyzer(bt.analyzers.DrawDown,_name = 'mydrawdown')
+    #     cerebro.addanalyzer(bt.analyzers.AnnualReturn,_name = 'myannualreturn')
+
+    #     #5.加载观察者 Observers
+    #     cerebro.addobserver(OrderObserver)
+
+    #     #6.设置仓位管理 Sizers
+    #     cerebro.addsizer(bt.sizers.FixedSize, stake=100)
+
+    #     #7.设置佣金管理 Commission
+    #     cerebro.broker.setcommission(commission=0.002)
+
+    #     #8.设置初始资金
+    #     cerebro.broker.setcash(100000)
+    #     print("Starting Portfolio Value: %.2f" % cerebro.broker.getvalue())
+
+    #     #9.启动回测
+    #     checkstrats = cerebro.run()
+    #     #数据源0 返回值处理
+    #     checkstrat = checkstrats[0]
+
+    #     #10.回测结果
+    #     print("Final Portfolio Value: %.2f" % cerebro.broker.getvalue())
+
+    #     print('夏普率:')
+    #     for k, v in checkstrat.analyzers.mysharpe.get_analysis().items():
+    #         print(k, ':', v)
+
+    #     print('最大回测:')
+    #     for k, v in checkstrat.analyzers.mydrawdown.get_analysis()['max'].items():
+    #         print('max ', k, ':', v)
+
+    #     print('年化收益率:')
+    #     for year, ann_ret in checkstrat.analyzers.myannualreturn.get_analysis().items():
+    #         print(year, ':', ann_ret)
+
+    #     #11.回测图示
+    #     cerebro.plot()
