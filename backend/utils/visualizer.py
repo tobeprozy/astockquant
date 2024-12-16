@@ -217,9 +217,24 @@ class StockIndicatorsVisualizer2:
             )
         )
         return bar
- 
+    
+    # 高开标记函数
+    def mark_high_open(self, kline, df):
+        high_open_points = []  # 存储高开的标记点
+        for i in range(1, len(df)):  # 从1开始，因为第一天没有前一天的收盘价
+            if df.loc[i, "open"] > df.loc[i-1, "close"]:  # 开盘价高于前一天的收盘价，标记为高开
+                high_open_points.append({
+                    "coord": [df.loc[i, "date"], df.loc[i, "open"]],
+                    "name": "高开"
+                })
+        kline.set_series_opts(
+            markpoint_opts=opts.MarkPointOpts(
+                data=high_open_points
+            )
+        )
+    
     # 绘制主图并输出页面
-    def Print_Main_index(self,kline,bar_volumn,line_ma=None,line_ma2=None,line_ma3=None,line_ma4 = None,itheme="light"):
+    def Print_Main_index(self,kline,bar_volumn,line_ma=None,line_ma2=None,line_ma3=None,line_ma4 = None,itheme="light",name=None):
         bar = bar_volumn
  
         kline.overlap(line_ma)
@@ -252,9 +267,12 @@ class StockIndicatorsVisualizer2:
             os.makedirs(output_dir)
             
 
-        grid_chart.render(path = "./StockAnalysis/pyecharts-xx.html")
+        # 调用高开标记函数
+        self.mark_high_open(kline, self.df)
+    
+        grid_chart.render(path = name)
         
-    def render_html(self):
+    def render_html(self,name="StockAnalysis/pyecharts-xx.html"):
         self.line_ma5 = self.get_Pyecharts_MA(5,2) # index由2开始
         self.line_ma10 = self.get_Pyecharts_MA(10,3)
         self.line_ma20 = self.get_Pyecharts_MA(20,4)
@@ -263,7 +281,7 @@ class StockIndicatorsVisualizer2:
         self.line_volma10 = self.get_Pyecharts_VolMA(10, 7)
         self.kline = self.get_Pyecharts_Kline()
         self.bar_volumn = self.get_Pyecharts_Bar().overlap(self.line_volma5).overlap(self.line_volma10)
-        self.Print_Main_index(self.kline, self.bar_volumn, self.line_ma5, self.line_ma10, self.line_ma20, self.line_ma50)
+        self.Print_Main_index(self.kline, self.bar_volumn, self.line_ma5, self.line_ma10, self.line_ma20, self.line_ma50,name=name)
 
 
 
@@ -468,9 +486,9 @@ if __name__ == "__main__":
     # plotter.plot_all("Stock_Indicators_Visualization.html")
     
 
-    calculator = StockTAIndicatorsCalculator(df)
-    calculator.cal_cdlupsidegap2crows()
-    calculator.cal_cdlseparatinglines()
+    # calculator = StockTAIndicatorsCalculator(df)
+    # calculator.cal_cdlupsidegap2crows()
+    # calculator.cal_cdlseparatinglines()
     # calculator.calculate_all_indicators()
 
     calculator = StockIndicatorsCalculator(df)

@@ -137,7 +137,8 @@ class FinancialDataFetcher:
             # 默认获取所有历史数据
             self.fund_info = ak.fund_etf_hist_em(symbol=symbol, period="daily", start_date="19900101", end_date="20240101", adjust="qfq")
         else:
-            self.fund_info = ak.fund_etf_hist_em(symbol=symbol, period="daily", start_date=start_date, end_date=end_date, adjust="qfq")
+            # self.fund_info = ak.fund_etf_hist_em(symbol=symbol, period="daily", start_date=start_date, end_date=end_date, adjust="qfq")
+            self.fund_info = ak.fund_etf_hist_em(symbol=symbol, period="daily", start_date=start_date, end_date=end_date, adjust="")
         return self.fund_info
     
     def filter_funds_by_name(self,df,name):

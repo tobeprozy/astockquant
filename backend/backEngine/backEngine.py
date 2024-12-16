@@ -11,16 +11,16 @@ from get_data.ak_data_fetch import FinancialDataFetcher
 import pandas as pd
 import backtrader as bt
 import logging
+import matplotlib.pyplot as plt
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 class BackEngine:
-    def __init__(self, stock_index, start_date, end_date, strategy):
+    def __init__(self, stock_index, start_date, end_date, strategy, start_cash=100000.0):
         self.stock_index = stock_index
         self.start_date = start_date
         self.end_date = end_date
         self.strategy = strategy
         self.cerebro = bt.Cerebro()
-        self.start_cash = 100000.0
+        self.start_cash = start_cash
 
     def fetch_data(self):
         # 创建数据获取器
@@ -74,6 +74,7 @@ class BackEngine:
 
     def plot_results(self):
         self.cerebro.plot()
+        plt.savefig('backtrader_plot.png')  # 保存绘图结果为 PNG 文件
 
 class MultiBackEngine(BackEngine):
     def __init__(self, stock_index, stock_index1, start_date, end_date, strategy):

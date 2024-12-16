@@ -16,9 +16,80 @@ import pyfolio as pf
 import matplotlib.pyplot as plt
 import backtrader as bt  # 升级到最新版，pip install matplotlib==3.2.2
 
-from strategies.strategy import Strategy1,SmaCross,PairTradingStrategy,Strategy_MACD
+from strategies.strategy import Strategy1,SmaCross,PairTradingStrategy,Strategy_MACD,Strategy_MCACD2
 
 from backEngine.backEngine import BackEngine,MultiBackEngine
+import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+
+
+def get_fund_data(stock_index,s_date,e_date):
+    # 创建数据获取器
+    fetcher = FinancialDataFetcher()
+    # 获取股票数据
+    fetcher.fetch_fund_info(symbol=stock_index, start_date=s_date, end_date=e_date)
+    fetcher.fund_rename()
+    return fetcher.fund_info
+if __name__ ==  "__main__":
+
+    stock_index = '512200'
+
+    s_date = (datetime.datetime.now() - datetime.timedelta(days=1000)).strftime('%Y%m%d')
+    e_date = datetime.datetime.now().strftime('%Y%m%d')
+
+    df=get_fund_data(stock_index,s_date,e_date)
+    print(df)
+    # 计算开盘幅度，即今天的开盘价与昨天的收盘价之间的变化
+    df['OpenAmplitude'] = (df['open'] - df['close'].shift(1)) / df['close'].shift(1) * 100
+    # 计算开盘幅度，即今天的开盘价与昨天的收盘价之间的变化
+    df['CloseAmplitude'] = (df['close'] - df['close'].shift(1)) / df['close'].shift(1) * 100
+
+    # 打印结果
+    print("**********************所有结果*************************")
+    print(df[['date', 'OpenAmplitude']])
+    
+    # 打印所有大于0的开盘幅度
+    print("**********************大于0的开盘幅度*************************")
+    print(df[df['OpenAmplitude'] > 0])
+    # 确定开盘幅度大于0的天数
+    positive_open_amplitude_count = df[df['OpenAmplitude'] > 0].shape[0]
+    # 计算总天数（排除第一天，因为它没有前一天的收盘价）
+    total_days = df.shape[0] - 1
+    # 计算占比
+    positive_open_amplitude_ratio = positive_open_amplitude_count / total_days
+    # 打印结果
+    
+    print(f"开盘幅度大于0的占比是: {positive_open_amplitude_ratio:.2f}")
+    
+    print("**********************大于0的，上一天*************************")
+    # 将'OpenAmplitude'列向上移动一行
+    df['NextOpenAmplitude'] = df['OpenAmplitude'].shift(-1)
+    # 打印高开的前一天的情况
+    print(df[df['NextOpenAmplitude'] > 0])
+    
+    ## 统计下一天高开时候，当天下跌的概率
+    total_days = df[df['NextOpenAmplitude'] > 0][0] - 1
+    
+
+
+    df.to_csv(f'{stock_index}.csv')
+    
+    
+    
+    
+if __name__ ==  "__main5__":
+
+    stock_index = '159607'
+
+    s_date = (datetime.datetime.now() - datetime.timedelta(days=120)).strftime('%Y%m%d')
+    e_date = datetime.datetime.now().strftime('%Y%m%d')
+
+    engine = BackEngine(stock_index, s_date, e_date, Strategy_MCACD2)
+    result = engine.run()
+    engine.print_results(result)
+    engine.plot_results()
+
 
 if __name__ ==  "__main4__":
 
@@ -34,7 +105,7 @@ if __name__ ==  "__main4__":
     engine.plot_results()
 
 
-if __name__ ==  "__main__":
+if __name__ ==  "__main3__":
 
     stock_index = '512200'
 
