@@ -16,13 +16,30 @@ import pyfolio as pf
 import matplotlib.pyplot as plt
 import backtrader as bt  # 升级到最新版，pip install matplotlib==3.2.2
 
-from strategies.strategy import Strategy1,SmaCross,PairTradingStrategy,Strategy_MACD,Strategy_MCACD2
+from strategies.strategy import Strategy1,SmaCross,PairTradingStrategy,Strategy_MACD,Strategy_MCACD2,Strategy_MACD3
 
 from backEngine.backEngine import BackEngine,MultiBackEngine
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
+if __name__ ==  "__main__":
+
+    stock_index = '512480' # 半导体ETF
+    stock_index = '512200' # 房地产ETF
+    stock_index = '159607' # 互联网ETF
+    # stock_index = '159892' # 医药ETF
+    # stock_index = '512690' # 白酒ETF
+
+    s_date = (datetime.datetime.now() - datetime.timedelta(days=240)).strftime('%Y%m%d')
+    e_date = datetime.datetime.now().strftime('%Y%m%d')
+
+    engine = BackEngine(stock_index, s_date, e_date, Strategy_MACD3)
+    result = engine.run()
+    engine.print_results(result)
+    engine.plot_results()
+    
+    
 
 def get_fund_data(stock_index,s_date,e_date):
     # 创建数据获取器
@@ -31,7 +48,8 @@ def get_fund_data(stock_index,s_date,e_date):
     fetcher.fetch_fund_info(symbol=stock_index, start_date=s_date, end_date=e_date)
     fetcher.fund_rename()
     return fetcher.fund_info
-if __name__ ==  "__main__":
+
+if __name__ ==  "__main6__":
 
     stock_index = '512200'
 
@@ -70,8 +88,6 @@ if __name__ ==  "__main__":
     
     ## 统计下一天高开时候，当天下跌的概率
     total_days = df[df['NextOpenAmplitude'] > 0][0] - 1
-    
-
 
     df.to_csv(f'{stock_index}.csv')
     
