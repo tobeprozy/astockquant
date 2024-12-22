@@ -396,6 +396,7 @@ class StockTAIndicatorsCalculator:
         slowperiod -- 慢速EMA周期，默认为26。
         signalperiod -- 信号线周期，默认为9。
         """
+        # Talib.MACD返回三个值，分别是macd, signal, hist，三个返回值分别对应上面的计算指标DIF、DEA、BAR。即macd=DIF，signal=DEA，hist=BAR。
         macd, macd_signal, macd_hist = talib.MACD(self.df['close'], fastperiod=fastperiod, slowperiod=slowperiod, signalperiod=signalperiod)
         self.df['MACD'] = macd
         self.df['MACD_SIGNAL'] = macd_signal
