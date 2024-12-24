@@ -284,6 +284,309 @@ class StockIndicatorsVisualizer2:
         self.Print_Main_index(self.kline, self.bar_volumn, self.line_ma5, self.line_ma10, self.line_ma20, self.line_ma50,name=name)
 
 
+    def plot_kline_1(self):
+        kline = (
+            Kline()
+            .add_xaxis(self.df["date"].tolist())
+            .add_yaxis(
+                series_name="Kline", 
+                y_axis=[
+                    [row['open'], row['close'], row['low'], row['high']]
+                    for _, row in self.df.iterrows()
+                    ],
+                itemstyle_opts=opts.ItemStyleOpts(
+                    color="#ef232a",
+                    color0="#14b143",
+                    border_color="#ef232a",
+                    border_color0="#14b143",
+                ),
+                markpoint_opts=opts.MarkPointOpts(
+                    data=[
+                        opts.MarkPointItem(type_="max", name="最大值"),
+                        opts.MarkPointItem(type_="min", name="最小值"),
+                    ]
+                ),
+                # markline_opts=opts.MarkLineOpts(
+                #     label_opts=opts.LabelOpts(
+                #         position="middle", color="blue", font_size=15
+                #     ),
+                #     data=split_data_part(),
+                #     symbol=["circle", "none"],
+                # ),
+            )
+            # .add_xaxis(xaxis_data=data["times"])
+            # .add_yaxis(
+            #     series_name="",
+            #     y_axis=data["datas"],
+            #     itemstyle_opts=opts.ItemStyleOpts(
+            #         color="#ef232a",
+            #         color0="#14b143",
+            #         border_color="#ef232a",
+            #         border_color0="#14b143",
+            #     ),
+            #     markpoint_opts=opts.MarkPointOpts(
+            #         data=[
+            #             opts.MarkPointItem(type_="max", name="最大值"),
+            #             opts.MarkPointItem(type_="min", name="最小值"),
+            #         ]
+            #     ),
+            #     markline_opts=opts.MarkLineOpts(
+            #         label_opts=opts.LabelOpts(
+            #             position="middle", color="blue", font_size=15
+            #         ),
+            #         data=split_data_part(),
+            #         symbol=["circle", "none"],
+            #     ),
+            # )
+            # .set_series_opts(
+            #     markarea_opts=opts.MarkAreaOpts(is_silent=True, data=split_data_part())
+            # )
+            .set_global_opts(
+                title_opts=opts.TitleOpts(title="K线周期图表", pos_left="0"),
+                xaxis_opts=opts.AxisOpts(
+                    type_="category",
+                    is_scale=True,
+                    boundary_gap=False,
+                    axisline_opts=opts.AxisLineOpts(is_on_zero=False),
+                    splitline_opts=opts.SplitLineOpts(is_show=False),
+                    split_number=20,
+                    min_="dataMin",
+                    max_="dataMax",
+                ),
+                yaxis_opts=opts.AxisOpts(
+                    is_scale=True, splitline_opts=opts.SplitLineOpts(is_show=True)
+                ),
+                tooltip_opts=opts.TooltipOpts(trigger="axis", axis_pointer_type="line"),
+                datazoom_opts=[
+                    opts.DataZoomOpts(
+                        is_show=False, type_="inside", xaxis_index=[0, 0], range_end=100
+                    ),
+                    opts.DataZoomOpts(
+                        is_show=True, xaxis_index=[0, 1], pos_top="97%", range_end=100
+                    ),
+                    opts.DataZoomOpts(is_show=False, xaxis_index=[0, 2], range_end=100),
+                ],
+                # 三个图的 axis 连在一块
+                # axispointer_opts=opts.AxisPointerOpts(
+                #     is_show=True,
+                #     link=[{"xAxisIndex": "all"}],
+                #     label=opts.LabelOpts(background_color="#777"),
+                # ),
+            )
+        )
+        return kline 
+
+    def plot_ma5(self):
+        ma5_line = (
+            Line()
+            .add_xaxis(xaxis_data=self.df["date"].tolist())
+            .add_yaxis(
+                series_name="MA5",
+                y_axis=self.df['MA5'].tolist(),
+                is_smooth=True,
+                linestyle_opts=opts.LineStyleOpts(opacity=0.5),
+                label_opts=opts.LabelOpts(is_show=False),
+            )
+            .set_global_opts(
+                xaxis_opts=opts.AxisOpts(
+                    type_="category",
+                    grid_index=1,
+                    axislabel_opts=opts.LabelOpts(is_show=False),
+                ),
+                yaxis_opts=opts.AxisOpts(
+                    grid_index=1,
+                    split_number=3,
+                    axisline_opts=opts.AxisLineOpts(is_on_zero=False),
+                    axistick_opts=opts.AxisTickOpts(is_show=False),
+                    splitline_opts=opts.SplitLineOpts(is_show=False),
+                    axislabel_opts=opts.LabelOpts(is_show=True),
+                ),
+            )
+        )
+        return ma5_line
+    
+    def plot_vol(self):
+        bar_1 = (
+            Bar()
+            .add_xaxis(xaxis_data=self.df["date"].tolist())
+            .add_yaxis(
+                series_name="vol",
+                y_axis=self.df["vol"].tolist(),
+                xaxis_index=1,
+                yaxis_index=1,
+                label_opts=opts.LabelOpts(is_show=False),
+                # 根据 echarts demo 的原版是这么写的
+                # itemstyle_opts=opts.ItemStyleOpts(
+                #     color=JsCode("""
+                #     function(params) {
+                #         var colorList;
+                #         if (data.datas[params.dataIndex][1]>data.datas[params.dataIndex][0]) {
+                #           colorList = '#ef232a';
+                #         } else {
+                #           colorList = '#14b143';
+                #         }
+                #         return colorList;
+                #     }
+                #     """)
+                # )
+                # 改进后在 grid 中 add_js_funcs 后变成如下
+                itemstyle_opts=opts.ItemStyleOpts(
+                    color=JsCode(
+                        """
+                    function(params) {
+                        var colorList;
+                        if (barData[params.dataIndex][1] > barData[params.dataIndex][0]) {
+                            colorList = '#ef232a';
+                        } else {
+                            colorList = '#14b143';
+                        }
+                        return colorList;
+                    }
+                    """
+                    )
+                ),
+            )
+            .set_global_opts(
+                xaxis_opts=opts.AxisOpts(
+                    type_="category",
+                    grid_index=1,
+                    axislabel_opts=opts.LabelOpts(is_show=False),
+                ),
+                legend_opts=opts.LegendOpts(is_show=False),
+            )
+        )
+        return bar_1
+    
+    def plot_macd_1(self):
+        # Bar-2 (Overlap Bar + Line)
+        bar_2 = (
+            Bar()
+            .add_xaxis(xaxis_data=self.df["date"].tolist())
+            .add_yaxis(
+                series_name="MACD",
+                y_axis=self.df['MACD_HIST'].tolist(),
+                xaxis_index=2,
+                yaxis_index=2,
+                label_opts=opts.LabelOpts(is_show=False),
+                itemstyle_opts=opts.ItemStyleOpts(
+                    color=JsCode(
+                        """
+                            function(params) {
+                                var colorList;
+                                if (params.data >= 0) {
+                                colorList = '#ef232a';
+                                } else {
+                                colorList = '#14b143';
+                                }
+                                return colorList;
+                            }
+                            """
+                    )
+                ),
+            )
+            .set_global_opts(
+                xaxis_opts=opts.AxisOpts(
+                    type_="category",
+                    grid_index=2,
+                    axislabel_opts=opts.LabelOpts(is_show=False),
+                ),
+                yaxis_opts=opts.AxisOpts(
+                    grid_index=2,
+                    split_number=4,
+                    axisline_opts=opts.AxisLineOpts(is_on_zero=False),
+                    axistick_opts=opts.AxisTickOpts(is_show=False),
+                    splitline_opts=opts.SplitLineOpts(is_show=False),
+                    axislabel_opts=opts.LabelOpts(is_show=True),
+                ),
+                legend_opts=opts.LegendOpts(is_show=False),
+            )
+        )
+        return bar_2
+
+    def plot_dif_dea(self):
+        line_2 = (
+            Line()
+            .add_xaxis(xaxis_data=self.df["date"].tolist())
+            .add_yaxis(
+                series_name="DIF",
+                y_axis=self.df["MACD"],
+                xaxis_index=2,
+                yaxis_index=2,
+                label_opts=opts.LabelOpts(is_show=False),
+            )
+            .add_yaxis(
+                series_name="DEA",
+                y_axis=self.df["MACD_SIGNAL"],
+                xaxis_index=2,
+                yaxis_index=2,
+                label_opts=opts.LabelOpts(is_show=False),
+            )
+            .set_global_opts(legend_opts=opts.LegendOpts(is_show=False))
+        )
+        return line_2
+    
+    def plot_cdl(self):
+        bar_1 = (
+            Bar()
+            .add_xaxis(xaxis_data=self.df["date"].tolist())
+            .add_yaxis(
+                series_name="CDLMORNINGSTAR",
+                y_axis=self.df["CDLMORNINGSTAR"].tolist(),
+                xaxis_index=1,
+                yaxis_index=1,
+                label_opts=opts.LabelOpts(is_show=False),
+            )
+            .set_global_opts(
+                xaxis_opts=opts.AxisOpts(
+                    type_="category",
+                    grid_index=1,
+                    axislabel_opts=opts.LabelOpts(is_show=False),
+                ),
+                legend_opts=opts.LegendOpts(is_show=False),
+            )
+        )
+        return bar_1
+
+    def render_html2(self):
+        kline=self.plot_kline_1()
+        ma5_line=self.plot_ma5()
+        macd_line=self.plot_macd_1()
+        dif_dea_line=self.plot_dif_dea()
+        overlap_kline_line = kline.overlap(ma5_line)
+        vol_line=self.plot_vol()
+        cdl_line=self.plot_cdl()
+        # 最下面的柱状图和折线图
+        overlap_bar_line = macd_line.overlap(dif_dea_line)
+
+        # 最后的 Grid
+        grid_chart = Grid()
+
+        # 这个是为了把 data.datas 这个数据写入到 html 中,还没想到怎么跨 series 传值
+        # demo 中的代码也是用全局变量传的
+        # grid_chart.add_js_funcs("var barData = {}".format(data["datas"]))
+
+        # K线图和 MA5 的折线图
+        grid_chart.add(
+            overlap_kline_line,
+            grid_opts=opts.GridOpts(pos_left="3%", pos_right="1%", height="60%"),
+        )
+        # Volumn 柱状图
+        grid_chart.add(
+            cdl_line,
+            grid_opts=opts.GridOpts(
+                pos_left="3%", pos_right="1%", pos_top="71%", height="10%"
+            ),
+        )
+        
+        # MACD DIFS DEAS
+        grid_chart.add(
+            overlap_bar_line,
+            grid_opts=opts.GridOpts(
+                pos_left="3%", pos_right="1%", pos_top="82%", height="14%"
+            ),
+        )
+        grid_chart.render("professional_kline_chart.html")
+
 
 class StockIndicatorsVisualizer:
     def __init__(self, data):
@@ -411,7 +714,8 @@ class StockIndicatorsVisualizer:
 
         # 渲染图表
         grid.render(name)
-    def plot_kline_1():
+        
+    def plot_kline_1(self):
         kline = (
             Kline()
             .add_xaxis(self.data['Date'].dt.strftime('%Y-%m-%d').tolist())
@@ -433,13 +737,13 @@ class StockIndicatorsVisualizer:
                         opts.MarkPointItem(type_="min", name="最小值"),
                     ]
                 ),
-                markline_opts=opts.MarkLineOpts(
-                    label_opts=opts.LabelOpts(
-                        position="middle", color="blue", font_size=15
-                    ),
-                    data=split_data_part(),
-                    symbol=["circle", "none"],
-                ),
+                # markline_opts=opts.MarkLineOpts(
+                #     label_opts=opts.LabelOpts(
+                #         position="middle", color="blue", font_size=15
+                #     ),
+                #     data=split_data_part(),
+                #     symbol=["circle", "none"],
+                # ),
             )
             # .add_xaxis(xaxis_data=data["times"])
             # .add_yaxis(
@@ -465,9 +769,9 @@ class StockIndicatorsVisualizer:
             #         symbol=["circle", "none"],
             #     ),
             # )
-            .set_series_opts(
-                markarea_opts=opts.MarkAreaOpts(is_silent=True, data=split_data_part())
-            )
+            # .set_series_opts(
+            #     markarea_opts=opts.MarkAreaOpts(is_silent=True, data=split_data_part())
+            # )
             .set_global_opts(
                 title_opts=opts.TitleOpts(title="K线周期图表", pos_left="0"),
                 xaxis_opts=opts.AxisOpts(
@@ -502,7 +806,7 @@ class StockIndicatorsVisualizer:
             )
         )
 
-    def plot_ma5():
+    def plot_ma5(self):
         ma5_line = (
             Line()
             .add_xaxis(xaxis_data=self.data['Date'].dt.strftime('%Y-%m-%d').tolist())
@@ -531,7 +835,7 @@ class StockIndicatorsVisualizer:
         )
         return ma5_line
     
-    def plot_vol():
+    def plot_vol(self):
         bar_1 = (
             Bar()
             .add_xaxis(xaxis_data=self.data['Date'].dt.strftime('%Y-%m-%d').tolist())
@@ -581,7 +885,7 @@ class StockIndicatorsVisualizer:
                 legend_opts=opts.LegendOpts(is_show=False),
             )
         )
-    def plot_macd_1():
+    def plot_macd_1(self):
         # Bar-2 (Overlap Bar + Line)
         bar_2 = (
             Bar()
@@ -627,7 +931,7 @@ class StockIndicatorsVisualizer:
         )
         return bar_2
 
-    def plot_dif_dea():
+    def plot_dif_dea(self):
         line_2 = (
             Line()
             .add_xaxis(xaxis_data=self.data['Date'].dt.strftime('%Y-%m-%d').tolist())
@@ -650,7 +954,7 @@ class StockIndicatorsVisualizer:
         return line_2
     
 
-    def rander_html():
+    def rander_html(self):
 
         overlap_kline_line = self.plot_kline_1.overlap(self.plot_ma5)
         # 最下面的柱状图和折线图
@@ -670,7 +974,7 @@ class StockIndicatorsVisualizer:
         )
         # Volumn 柱状图
         grid_chart.add(
-            bar_1,
+            self.plot_vol,
             grid_opts=opts.GridOpts(
                 pos_left="3%", pos_right="1%", pos_top="71%", height="10%"
             ),
@@ -760,13 +1064,10 @@ if __name__ == "__main__":
     # calculator.cal_cdlseparatinglines()
     # calculator.calculate_all_indicators()
 
-    calculator = StockIndicatorsCalculator(df)
-    calculator.get_MA(5)
-    calculator.get_MA(10)
-    calculator.get_MA(20)
-    calculator.get_MA(150)
-    calculator.get_Vol_MA(5)
-    calculator.get_Vol_MA(10)
+    calculator = StockTAIndicatorsCalculator(df)
+    calculator.cal_ma(timeperiod=5)
+    calculator.calculate_macd(12, 26, 9)
+    calculator.cal_cdlmorningstar()
 
-    plotter = StockIndicatorsVisualizer2(calculator.data)
-    plotter.render_html()
+    plotter = StockIndicatorsVisualizer2(calculator.df)
+    plotter.render_html2()
