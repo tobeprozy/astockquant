@@ -829,6 +829,12 @@ if __name__ == "__main__":
     calculator.cal_ma(timeperiod=5)
     calculator.calculate_macd(12, 26, 9)
     calculator.cal_cdlmorningstar()
+    calculator = StockTAIndicatorsCalculator(df)
+    calculator.cal_ma(timeperiod=5)
+    calculator.calculate_macd(12, 26, 9)
+    calculator.cal_cdlmorningstar()
 
+    plotter = StockIndicatorsVisualizer2(calculator.df)
+    plotter.render_html2()
     plotter = StockIndicatorsVisualizer2(calculator.df)
     plotter.render_html2()
