@@ -63,6 +63,7 @@ class AkDataFetcher:
         elif self.interval == '1m':
             # 假设ETF分钟数据接口如下，实际使用时请替换为正确的接口
             return ak.fund_etf_hist_min_em(symbol, period="1", adjust="", start_date=self.start_date, end_date=self.end_date)
+        elif self.interval
         else:
             raise ValueError("Unsupported interval for ETFs.")
 
