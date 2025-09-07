@@ -11,7 +11,6 @@ from email import encoders
 from typing import Dict, Any, List, Optional
 
 import pandas as pd
-
 import akshare as ak
 import matplotlib.pyplot as plt
 
@@ -19,11 +18,9 @@ import matplotlib.pyplot as plt
 # ------------------------------
 # Configuration
 # ------------------------------
-# Symbols to watch. For US ETFs/stocks via EastMoney API in akshare, the code format often is
-# "105.TSLL" (NASDAQ) or "106.TSLA" etc. Adjust as needed.
+# A-share ETF symbols to watch
 SYMBOLS: List[str] = [
-    "105.TSLL",
-    "105.TSDD",
+    "512710",  # 中证500ETF
 ]
 
 # Email settings: hardcoded per your request (163 Mail, SSL on 465)
@@ -43,7 +40,7 @@ BOLL_PERIOD: int = 20
 BOLL_STD: float = 2.0
 
 # State persistence
-STATE_FILE: str = os.path.join(os.path.dirname(__file__), "watch_signals_state.json")
+STATE_FILE: str = os.path.join(os.path.dirname(__file__), "watch_ashare_etf_state.json")
 PLOT_DIR: str = os.path.join(os.path.dirname(__file__), "plots")
 
 # runtime store for latest computed indicators per symbol
@@ -53,7 +50,7 @@ LATEST_DATA: Dict[str, pd.DataFrame] = {}
 # ------------------------------
 # Logging
 # ------------------------------
-logger = logging.getLogger("watch_signals")
+logger = logging.getLogger("watch_ashare_etf")
 if not logger.handlers:
     _handler = logging.StreamHandler()
     _formatter = logging.Formatter(
@@ -193,12 +190,13 @@ def send_email_with_attachments(subject: str, body: str, attachment_paths: List[
 
 
 def fetch_last_5_trading_days(symbol: str) -> pd.DataFrame:
-    # Eastmoney intraday API requires start and end timestamps.
-    # We'll set start as now - 10 days to be safe; the API returns market days only.
+    # A-share ETF intraday API
     end_dt = datetime.now()
     start_dt = end_dt - timedelta(days=10)
-    df = ak.stock_us_hist_min_em(
+    df = ak.fund_etf_hist_min_em(
         symbol=symbol,
+        period="1",
+        adjust="",
         start_date=start_dt.strftime("%Y-%m-%d %H:%M:%S"),
         end_date=end_dt.strftime("%Y-%m-%d %H:%M:%S"),
     )
@@ -413,5 +411,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
