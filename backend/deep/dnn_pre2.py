@@ -21,15 +21,13 @@ if root not in sys.path:
     sys.path.append(root)
 
 
-from get_data.ak_data_fetch import AkDataFetcher
+from adapters.akshare_provider import AkshareFundProvider
 
 
 def adapt_backtrader(df):
-    # 利用 AKShare 获取股票的后复权数据，这里只获取前 6 列
-    df = df.iloc[:, :6]
-    # 删除 `股票代码` 列
-    # del df['股票代码']
-    # 处理字段命名，以符合 Backtrader 的要求
+    # 保持与旧逻辑兼容
+    df = df.reset_index()
+    df = df[['date','open','close','high','low','volume']]
     df.columns = [
         'Date',
         'Open',
@@ -63,9 +61,9 @@ if __name__ == "__main__":
     e_date = datetime.datetime.now().strftime('%Y-%m-%d')
 
     # 获取数据
-    fetcher = AkDataFetcher(start_date=s_date, end_date=e_date, interval='1d')
-    etf_data = fetcher.get_data(symbol="159892", data_type='etf')
-    df = adapt_backtrader(etf_data)
+    provider = AkshareFundProvider()
+    df_raw = provider.fetch(symbol="159892", start_date=s_date.replace('-', ''), end_date=e_date.replace('-', ''))
+    df = adapt_backtrader(df_raw)
     print(df.shape)
 
     # 将Pandas DataFrame转换为PyTorch张量，排除日期列

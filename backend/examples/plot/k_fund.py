@@ -10,8 +10,7 @@ root = os.path.abspath(os.path.join(cur_dir, '..'))
 if root not in sys.path:
     sys.path.append(root)
 
-
-from get_data.ak_data_fetch import FinancialDataFetcher
+from adapters.akshare_provider import AkshareFundProvider
 
 # 定义一个字典，将中文列标题映射到英文列标题
 columns_mapping = {
@@ -29,35 +28,31 @@ columns_mapping = {
 }
 
 
-
 if __name__ == "__main__":
 
-    fetcher = FinancialDataFetcher()
-    # stock_info=fetcher.fetch_stock_list()
-    # fund_info=fetcher.fetch_fund_list()
-    # print(fetcher.filter_funds_by_name(fetcher.fund_list,"医药"))
-    
-    # fetcher.save_stock_list("stock_list.json")
-    # fetcher.save_fund_list("fund_list.json")
+    provider = AkshareFundProvider()
 
     with open("fund_list.json", 'r', encoding='utf-8') as f:
         data = json.load(f)
-    
-    df=[]
+    df = []
     for i, item in enumerate(data):
-        if i < 1:  # 只遍历前五个
+        if i < 1:  # 只遍历前一个
             print(item)
-            df=fetcher.fetch_fund_info(symbol=item['基金代码'])
+            df = provider.fetch(symbol=item['基金代码'], start_date=None, end_date=None)
             print(df)
-
         else:
             break
 
-    # 使用rename方法更新列标题
-    df.rename(columns=columns_mapping, inplace=True)
+    # 使用rename方法更新列标题（当为中文列时）
+    if '日期' in df.columns:
+        df.rename(columns=columns_mapping, inplace=True)
     import pandas as pd
     # 确保 Date 列是 datetime 类型
-    df['Date'] = pd.to_datetime(df['Date'])
+    if 'Date' in df.columns:
+        df['Date'] = pd.to_datetime(df['Date'])
+    else:
+        # 若已经是 index，则转列用于绘图
+        df = df.reset_index().rename(columns={'date': 'Date', 'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close', 'volume': 'Volume'})
 
     import pandas as pd
     from pyecharts import options as opts

@@ -7,7 +7,7 @@ cur_dir = os.path.dirname(os.path.abspath(__file__))
 root = os.path.abspath(os.path.join(cur_dir, '..'))
 if root not in sys.path:
     sys.path.append(root) 
-from get_data.ak_data_fetch import FinancialDataFetcher
+from adapters.akshare_provider import AkshareFundProvider
 import datetime
 import pandas as pd
 
@@ -26,12 +26,12 @@ def process_stocks(stocks, s_date, e_date):
     return all_features, all_labels
 
 def get_fund_data(stock_index,s_date,e_date):
-    # 创建数据获取器
-    fetcher = FinancialDataFetcher()
-    # 获取股票数据
-    fetcher.fetch_fund_info(symbol=stock_index, start_date=s_date, end_date=e_date)
-    fetcher.fund_rename()
-    return fetcher.fund_info
+    provider = AkshareFundProvider()
+    df = provider.fetch(symbol=stock_index, start_date=s_date, end_date=e_date)
+    # provider 返回标准化英文字段且以 datetime 索引，这里保持兼容
+    df = df.reset_index()
+    df.rename(columns={'date':'date','open':'open','high':'high','low':'low','close':'close','volume':'vol'}, inplace=True)
+    return df
 
 import json
 import time
@@ -110,10 +110,8 @@ if __name__ == "__main__":
     s_date = "20120925"
     e_date = datetime.datetime.now().strftime('%Y%m%d')
 
-    fetcher = FinancialDataFetcher()
-    fund_info=fetcher.fetch_fund_list()
-    fetcher.save_fund_list("fund_list.json")
-
+    provider = AkshareFundProvider()
+    # 若需要基金列表，可在 provider 层扩展相应方法；此处保留现有列表读取逻辑
     with open("fund_list.json", 'r', encoding='utf-8') as f:
         data = json.load(f)
     
@@ -121,7 +119,6 @@ if __name__ == "__main__":
         if i < 200:  # 只遍历前五个
             print(item['基金代码'])
             df=get_fund_data(item['基金代码'],s_date=s_date,e_date=e_date)
-            # time.sleep(2)
             print(df)
             print(f"size:{df.index.size}")
             if df.index.size == 0:  # 如果DataFrame没有列，即为空

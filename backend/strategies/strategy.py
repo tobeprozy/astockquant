@@ -2,6 +2,12 @@
 import backtrader as bt  # 升级到最新版，pip install matplotlib==3.2.2
 
 class StrategyBase(bt.Strategy):
+    def __init__(self):
+        self._emailer = None
+        super().__init__()
+
+    def set_emailer(self, emailer):
+        self._emailer = emailer
     def notify_order(self, order):
         # 未被处理的订单
         if order.status in [order.Submitted, order.Accepted]:
@@ -17,6 +23,14 @@ class StrategyBase(bt.Strategy):
                         order.executed.comm,  # 佣金
                         order.executed.size,  # 成交量
                         order.data._name))  # 股票名称
+                if getattr(self, '_emailer', None):
+                    try:
+                        self._emailer.send(
+                            subject=f"BUY {order.data._name}",
+                            body=f"Price: {order.executed.price}, Size: {order.executed.size}"
+                        )
+                    except Exception:
+                        pass
             else:  # Sell
                 self.log('SELL EXECUTED, ref:%.0f, Price: %.2f, Cost: %.2f, Comm %.2f, Size: %.2f, Stock: %s' %
                             (order.ref,
@@ -25,6 +39,14 @@ class StrategyBase(bt.Strategy):
                             order.executed.comm,
                             order.executed.size,
                             order.data._name))
+                if getattr(self, '_emailer', None):
+                    try:
+                        self._emailer.send(
+                            subject=f"SELL {order.data._name}",
+                            body=f"Price: {order.executed.price}, Size: {order.executed.size}"
+                        )
+                    except Exception:
+                        pass
 
 class MyStrategy(StrategyBase):
     # 定义我们自己写的这个 MyStrategy 类的专有属性
@@ -209,7 +231,7 @@ cur_dir = os.path.dirname(os.path.abspath(__file__))
 root = os.path.abspath(os.path.join(cur_dir, '..'))
 if root not in sys.path:
     sys.path.append(root)
-from get_data.ak_data_fetch import FinancialDataFetcher
+from adapters.akshare_provider import AkshareFundProvider
 import datetime
 import pandas as pd
 import pyfolio as pf
@@ -222,16 +244,8 @@ if __name__ ==  "__main__":
     s_date = (datetime.datetime.now() - datetime.timedelta(days=1000)).strftime('%Y%m%d')
     e_date = datetime.datetime.now().strftime('%Y%m%d')
 
-    # 创建数据获取器
-    fetcher = FinancialDataFetcher()
-    # 获取股票数据
-    fetcher.fetch_fund_info(symbol=stock_index, start_date=s_date, end_date=e_date)
-    fetcher.fund_rename()
-    df=fetcher.fund_info.iloc[:,:6]
-    df.columns = ['date', 'open', 'high', 'low', 'close', 'volume'] # 字段必须相同，不然会报错Axis limits cannot be NaN or Inf
-    print(df)
-    df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d')  # 使用正确的格式
-    df.set_index('date', inplace=True)  # 将 'date' 列设置为索引
+    provider = AkshareFundProvider()
+    df = provider.fetch(symbol=stock_index, start_date=s_date, end_date=e_date)
 
     # 创建 Backtrader 数据源
     data = bt.feeds.PandasData(dataname=df)

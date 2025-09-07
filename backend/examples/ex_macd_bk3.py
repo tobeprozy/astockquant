@@ -19,9 +19,6 @@ if root not in sys.path:
     sys.path.append(root)
 
 
-from get_data.ak_data_fetch import AkDataFetcher
-
-
 # 创建 一个Stratey
 class TestStrategy(bt.Strategy):
     params = (

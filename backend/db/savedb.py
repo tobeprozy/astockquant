@@ -7,9 +7,10 @@ cur_dir = os.path.dirname(os.path.abspath(__file__))
 root = os.path.abspath(os.path.join(cur_dir, '..'))
 if root not in sys.path:
     sys.path.append(root) 
-from get_data.ak_data_fetch import FinancialDataFetcher
+from adapters.akshare_provider import AkshareFundProvider
 import datetime
 import pandas as pd
+
 
 
 def create_table_from_df(df, conn, table_name):
@@ -33,9 +34,7 @@ def insert_data_from_df(df, conn, table_name):
 
 def save_db(db_name,df):
     # 连接到 SQLite 数据库
-    # 数据库文件是 "test.db"，如果文件不存在，会自动在当前目录创建:
     conn = sqlite3.connect(db_name)
-    # 创建一个表
     # 创建表
     create_table_from_df(df, conn, "fund_data")
 
@@ -47,12 +46,11 @@ def save_db(db_name,df):
 
 
 def get_fund_data(stock_index,s_date,e_date):
-    # 创建数据获取器
-    fetcher = FinancialDataFetcher()
-    # 获取股票数据
-    fetcher.fetch_fund_info(symbol=stock_index, start_date=s_date, end_date=e_date)
-    fetcher.fund_rename()
-    return fetcher.fund_info
+    provider = AkshareFundProvider()
+    df = provider.fetch(symbol=stock_index, start_date=s_date, end_date=e_date)
+    # provider 返回标准英文列并以日期索引；保存前恢复为列并匹配原列名
+    df = df.reset_index().rename(columns={'date':'date','open':'open','high':'high','low':'low','close':'close','volume':'vol'})
+    return df
     
 
 def load_db_to_dataframe(db_name):
@@ -82,6 +80,7 @@ if __name__ ==  "__main__":
     save_db(f"{stock_index}.db",df)
 
     load_db_to_dataframe(f"{stock_index}.db")
+
 
 
 

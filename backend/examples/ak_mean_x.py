@@ -11,24 +11,20 @@ if root not in sys.path:
     sys.path.append(root)
 
 
-from get_data.ak_data_fetch import AkDataFetcher
+from adapters.akshare_provider import AkshareFundProvider
 
 
 if __name__ == "__main__":
-    fetcher = AkDataFetcher(start_date='2024-01-01', end_date='2024-12-07', interval='1d')
-    stock_data = fetcher.get_data(symbol="600519", data_type='stock')
-    etf_data = fetcher.get_data(symbol="511220", data_type='etf')
-
-    # print(stock_data)
-    # print(etf_data)
-
+    provider = AkshareFundProvider()
+    stock_data = provider.fetch(symbol="600519", start_date='20240101', end_date='20241207')
+    etf_data = provider.fetch(symbol="511220", start_date='20240101', end_date='20241207')
 
     data = stock_data.reset_index()
 
     # caculate mean value of 1, 5, 10 days
-    data['1'] = data['收盘']
-    data['5'] = data['收盘'].rolling(5).mean()
-    data['10'] = data['收盘'].rolling(10).mean()
+    data['1'] = data['close']
+    data['5'] = data['close'].rolling(5).mean()
+    data['10'] = data['close'].rolling(10).mean()
 
     data['Signal'] = 0
     # 短期均线上穿长期均线，产生买入信号
@@ -36,14 +32,14 @@ if __name__ == "__main__":
     # 短期均线下穿长期均线，产生卖出信号
     data.loc[data['5'] < data['10'], 'Signal'] = -1
 
-    data['Daily_Return'] = data['收盘'].pct_change()
+    data['Daily_Return'] = data['close'].pct_change()
     data['Strategy_Return'] = data['Daily_Return'] * data['Signal'].shift(1)
     data['Cumulative_Return'] = (1 + data['Strategy_Return']).cumprod() - 1
 
 
     plt.figure(figsize=(10, 6))
     plt.plot(data['Cumulative_Return'], label='Strategy Return', color='b')
-    plt.plot(data['收盘'] / data['收盘'].iloc[0], label='Stock', color='g')
+    plt.plot(data['close'] / data['close'].iloc[0], label='Stock', color='g')
     plt.title("Strategy Return vs. Stock")
     plt.xlabel("Date")
     plt.ylabel("Strategy Cumulative Return")

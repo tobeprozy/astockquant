@@ -759,7 +759,7 @@ root = os.path.abspath(os.path.join(cur_dir, '..'))
 if root not in sys.path:
     sys.path.append(root)
 
-from get_data.ak_data_fetch import FinancialDataFetcher
+from adapters.akshare_provider import AkshareFundProvider
 
 # 定义一个字典，将中文列标题映射到英文列标题
 columns_mapping = {
@@ -799,31 +799,16 @@ import datetime
 
 if __name__ == "__main__":
 
-    fetcher = FinancialDataFetcher()
+    provider = AkshareFundProvider()
     # 设置日期范围
     s_date = (datetime.datetime.now() - datetime.timedelta(days=1000)).strftime('%Y%m%d')
     e_date = datetime.datetime.now().strftime('%Y%m%d')
 
+    df = provider.fetch(symbol="512200", start_date=s_date, end_date=e_date)
 
-    df=fetcher.fetch_fund_info(symbol="512200", start_date=s_date, end_date=e_date)
-
-    df.rename(columns=columns_mapping2, inplace=True)
-    # 假设df是包含股票数据的DataFrame
-    # calculator = StockIndicatorsCalculator(df)
-    # calculator.calculate_ma(5)
-    # calculator.calculate_ema(5)
-    # calculator.calculate_rsi(14)
-    # calculator.calculate_bbands(5)
-    # calculator.calculate_macd(12, 26, 9)
-
-    # plotter = StockIndicatorsVisualizer(calculator.data)
-    # plotter.plot_all("Stock_Indicators_Visualization.html")
-    
-
-    # calculator = StockTAIndicatorsCalculator(df)
-    # calculator.cal_cdlupsidegap2crows()
-    # calculator.cal_cdlseparatinglines()
-    # calculator.calculate_all_indicators()
+    # 如果是中文列，则进行重命名；否则跳过
+    if '日期' in df.columns:
+        df.rename(columns=columns_mapping2, inplace=True)
 
     calculator = StockTAIndicatorsCalculator(df)
     calculator.cal_ma(timeperiod=5)

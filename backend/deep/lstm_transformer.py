@@ -73,7 +73,7 @@ root = os.path.abspath(os.path.join(cur_dir, '..'))
 if root not in sys.path:
     sys.path.append(root)
 
-from get_data.ak_data_fetch import FinancialDataFetcher
+from adapters.akshare_provider import AkshareFundProvider
 
 
 from utils.indictor import StockTAIndicatorsCalculator
@@ -106,10 +106,6 @@ def train_val_test_split(X, y, train_ratio=0.7, val_ratio=0.15):
 
     return X_train, X_val, X_test, y_train, y_val, y_test
 
-<<<<<<< HEAD
-
-=======
->>>>>>> 35607909919233883c751c8f36edad03046a2590
 # 定义 PyTorch 数据集类
 class TimeSeriesDataset(Dataset):
     def __init__(self, features, labels):
@@ -133,13 +129,10 @@ if __name__ ==  "__main__":
     s_date = (datetime.datetime.now() - datetime.timedelta(days=10000)).strftime('%Y%m%d')
     e_date = datetime.datetime.now().strftime('%Y%m%d')
 
-    # 创建数据获取器
-    fetcher = FinancialDataFetcher()
-    # 获取股票数据
-    fetcher.fetch_fund_info(symbol=stock_index, start_date=s_date, end_date=e_date)
-    fetcher.fund_rename()
-
-    df=fetcher.fund_info
+    provider = AkshareFundProvider()
+    df = provider.fetch(symbol=stock_index, start_date=s_date, end_date=e_date)
+    if 'vol' not in df.columns and 'volume' in df.columns:
+        df['vol'] = df['volume']
 
     calculator = StockTAIndicatorsCalculator(df)
 
@@ -158,13 +151,13 @@ if __name__ ==  "__main__":
     df.fillna(method='ffill', inplace=True)
     df.fillna(method='bfill', inplace=True)
 
-    # 选择特征和标签
-<<<<<<< HEAD
-    # features = df[['open', 'high', 'low', 'vol', 'Turnover', 'Amplitude', 'ChangePercent', 'MA5', 'MA10', 'MA20', 'STOCH_SLOWK', 'STOCH_SLOWD', 'MACD', 'MACD_SIGNAL', 'MACD_HIST']]
-    features = df[['open','close','high', 'low', 'vol', 'Turnover',  'MA5', 'MA10', 'MA20', 'MACD', 'MACD_SIGNAL', 'MACD_HIST']]
-=======
-    features = df[['open', 'high', 'low', 'vol', 'Turnover', 'Amplitude', 'ChangePercent', 'MA5', 'MA10', 'MA20', 'STOCH_SLOWK', 'STOCH_SLOWD', 'MACD', 'MACD_SIGNAL', 'MACD_HIST']]
->>>>>>> 35607909919233883c751c8f36edad03046a2590
+    # 选择特征和标签（按可用列简化）
+    for col in ['MA5','MA10','MA20','MACD','MACD_SIGNAL','MACD_HIST']:
+        if col not in df.columns:
+            raise RuntimeError(f"Missing required feature column: {col}")
+    if 'vol' not in df.columns:
+        df['vol'] = df['volume'] if 'volume' in df.columns else 0
+    features = df[['open','close','high','low','vol','MA5','MA10','MA20','MACD','MACD_SIGNAL','MACD_HIST']]
     # 计算明天的价格相对于今天的变化
     df['next_close'] = df['close'].shift(-1)  # 创建一个新列，其中包含下一天的收盘价
     df['is_up'] = (df['next_close'] > df['close']).astype(int)  # 如果下一天的收盘价高于今天，则标签为1
@@ -182,11 +175,7 @@ if __name__ ==  "__main__":
     val_dataset = TimeSeriesDataset(X_val, y_val)
     test_dataset = TimeSeriesDataset(X_test, y_test)
 
-<<<<<<< HEAD
     batch_size = 32
-=======
-    batch_size = 4
->>>>>>> 35607909919233883c751c8f36edad03046a2590
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)

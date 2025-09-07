@@ -21,7 +21,7 @@ if root not in sys.path:
     sys.path.append(root)
 
 
-from get_data.ak_data_fetch import AkDataFetcher
+from adapters.akshare_provider import AkshareFundProvider
 
 
 def adapt_backtrader(df):
@@ -81,10 +81,11 @@ if __name__ == "__main__":
     s_date = (datetime.datetime.now() - datetime.timedelta(days=3000)).strftime('%Y-%m-%d')
     e_date = datetime.datetime.now().strftime('%Y-%m-%d')
 
-    fetcher = AkDataFetcher(start_date=s_date, end_date=e_date, interval='1d')
-
-    etf_data = fetcher.get_data(symbol="159892", data_type='etf')
-    df=adapt_backtrader(etf_data)
+    provider = AkshareFundProvider()
+    df = provider.fetch(symbol="159892", start_date=s_date.replace('-', ''), end_date=e_date.replace('-', ''))
+    df = df.reset_index()
+    df = df[['date','open','close','high','low','volume']]
+    df.columns = ['Date','Open','Close','High','Low','Vol']
     print(df.shape)
 
     # ms = MinMaxScaler()
