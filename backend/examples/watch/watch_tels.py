@@ -22,8 +22,8 @@ import matplotlib.pyplot as plt
 # Symbols to watch. For US ETFs/stocks via EastMoney API in akshare, the code format often is
 # "105.TSLL" (NASDAQ) or "106.TSLA" etc. Adjust as needed.
 SYMBOLS: List[str] = [
-    "105.TSLL",
     "105.TSDD",
+    "107.YANG",
 ]
 
 # Email settings: hardcoded per your request (163 Mail, SSL on 465)
@@ -83,9 +83,10 @@ def save_state(state: Dict[str, Any]) -> None:
 
 
 def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
-    # Expect columns: 时间, 开盘, 收盘, 最高, 最低, 成交量, 成交额, etc.
-    # Normalize column names
+    # Expect columns: 时间/收盘/开盘/最高/最低 or already-normalized with time index and close/open/high/low.
     df = df.copy()
+
+    # Normalize column names if raw Chinese columns present
     if "时间" in df.columns:
         df.rename(columns={"时间": "time"}, inplace=True)
     if "收盘" in df.columns:
@@ -97,10 +98,15 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
     if "最低" in df.columns:
         df.rename(columns={"最低": "low"}, inplace=True)
 
-    # Parse time
-    df["time"] = pd.to_datetime(df["time"])  # type: ignore[index]
-    df.sort_values("time", inplace=True)
-    df.set_index("time", inplace=True)
+    # Ensure datetime index
+    if "time" in df.columns:
+        df["time"] = pd.to_datetime(df["time"])  # type: ignore[index]
+        df.sort_values("time", inplace=True)
+        df.set_index("time", inplace=True)
+    else:
+        # If already time-indexed, keep as is; otherwise raise
+        if not isinstance(df.index, pd.DatetimeIndex):
+            raise KeyError("time")
 
     # MACD
     ema_fast = df["close"].ewm(span=MACD_FAST, adjust=False).mean()
@@ -125,6 +131,26 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
+
+def normalize_prices(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize raw dataframe to time-indexed OHLC DataFrame without indicators."""
+    df = df.copy()
+    if "时间" in df.columns:
+        df.rename(columns={"时间": "time"}, inplace=True)
+    if "收盘" in df.columns:
+        df.rename(columns={"收盘": "close"}, inplace=True)
+    if "开盘" in df.columns:
+        df.rename(columns={"开盘": "open"}, inplace=True)
+    if "最高" in df.columns:
+        df.rename(columns={"最高": "high"}, inplace=True)
+    if "最低" in df.columns:
+        df.rename(columns={"最低": "low"}, inplace=True)
+
+    if "time" in df.columns:
+        df["time"] = pd.to_datetime(df["time"])  # type: ignore[index]
+        df.sort_values("time", inplace=True)
+        df.set_index("time", inplace=True)
+    return df
 
 def detect_cross(prev_macd: float, prev_signal: float, curr_macd: float, curr_signal: float) -> Optional[str]:
     # Golden cross: macd crosses up through signal
@@ -196,11 +222,9 @@ def fetch_last_5_trading_days(symbol: str) -> pd.DataFrame:
     # Eastmoney intraday API requires start and end timestamps.
     # We'll set start as now - 10 days to be safe; the API returns market days only.
     end_dt = datetime.now()
-    start_dt = end_dt - timedelta(days=10)
+    start_dt = end_dt - timedelta(days=5)
     df = ak.stock_us_hist_min_em(
-        symbol=symbol,
-        start_date=start_dt.strftime("%Y-%m-%d %H:%M:%S"),
-        end_date=end_dt.strftime("%Y-%m-%d %H:%M:%S"),
+        symbol=symbol
     )
     if df is not None and not df.empty:
         try:
@@ -212,40 +236,64 @@ def fetch_last_5_trading_days(symbol: str) -> pd.DataFrame:
 
 
 def process_symbol(symbol: str, state: Dict[str, Any]) -> None:
+    """Incrementally update symbol data and compute alerts only on new bars."""
     try:
         raw_df = fetch_last_5_trading_days(symbol)
         if raw_df is None or raw_df.empty:
             logger.warning("no data fetched for %s", symbol)
             return
-        df = compute_indicators(raw_df)
-        try:
-            logger.info("computed indicators for %s: %s", symbol, df.tail(3)[["close","macd","signal","boll_mid","boll_upper","boll_lower"]].to_dict(orient="records"))
-        except Exception:
-            logger.info("computed indicators for %s (tail log failed)", symbol)
+        # Normalize first
+        price_df = normalize_prices(raw_df)
     except Exception:
-        logger.exception("failed to fetch/compute for %s", symbol)
+        logger.exception("failed to fetch/normalize for %s", symbol)
         return
 
+    # Merge to cache and compute indicators only for a small tail window
+    cached = LATEST_DATA.get(symbol)
+    if cached is not None and not cached.empty:
+        # Append only rows that do not exist in history (dedup by timestamp)
+        new_idx = price_df.index.difference(cached.index)
+        append_df = price_df.loc[new_idx]
+        if append_df.empty:
+            logger.info("no new bars for %s (all fetched bars already cached)", symbol)
+            return
+        base = cached.drop(columns=[c for c in ["macd","signal","hist","boll_mid","boll_upper","boll_lower"] if c in cached.columns])
+        merged = pd.concat([base, append_df])
+        merged.sort_index(inplace=True)
+    else:
+        # first load: compute full indicators
+        merged = price_df
+
+    # To avoid recomputing the entire history, recompute indicators on a tail window
+    # but MACD/BOLL need prior context; take a warmup window
+    warmup = max(MACD_SLOW + MACD_SIGNAL, BOLL_PERIOD) + 5
+    tail_start = max(0, len(merged) - (warmup + 500))  # cap to recent 500 bars plus warmup
+    head_df = merged.iloc[:tail_start]
+    tail_df = merged.iloc[tail_start:]
+    tail_with_ind = compute_indicators(tail_df)
+    if head_df.empty:
+        df = tail_with_ind
+    else:
+        # ensure no duplicate columns
+        df = pd.concat([head_df, tail_with_ind])
+
+    # Determine new rows compared to previous processed timestamp
     symbol_state: Dict[str, Any] = state.get(symbol, {})
     last_processed_iso: Optional[str] = symbol_state.get("last_processed_time")
-    last_signal: Optional[str] = symbol_state.get("last_signal")  # "buy" | "sell" | None
+    last_signal: Optional[str] = symbol_state.get("last_signal")
 
-    # Make latest df available for plotting regardless of new bars
     LATEST_DATA[symbol] = df
 
-    # Filter new rows only
     if last_processed_iso:
         last_dt = pd.to_datetime(last_processed_iso)
         new_df = df[df.index > last_dt]
     else:
-        # On first run, only evaluate the latest bar to avoid back-alerts
         new_df = df.tail(1)
 
     if new_df.empty:
         logger.info("no new bars for %s since %s", symbol, last_processed_iso)
         return
 
-    # Iterate in chronological order
     new_df = new_df.sort_index()
     prev_row = df.loc[: new_df.index[0]].iloc[-2] if len(df.loc[: new_df.index[0]]) >= 2 else None
 
@@ -276,40 +324,36 @@ def process_symbol(symbol: str, state: Dict[str, Any]) -> None:
             float(row["signal"]),
         )
 
-        if cross == "golden":
-            if last_signal != "buy":
-                logger.info("%s GOLDEN CROSS at %s -> BUY alert", symbol, idx)
-                subject = f"{symbol} MACD 金叉 信号 - 买入"
-                body = (
-                    f"Symbol: {symbol}\nTime: {idx}\n"
-                    f"Close: {row['close']:.4f}\nMACD: {row['macd']:.6f}, Signal: {row['signal']:.6f}\n"
-                    f"BOLL Mid: {row.get('boll_mid', float('nan')):.4f}, Upper: {row.get('boll_upper', float('nan')):.4f}, Lower: {row.get('boll_lower', float('nan')):.4f}"
-                )
-                send_email(subject, body)
-                last_signal = "buy"
+        if cross == "golden" and last_signal != "buy":
+            logger.info("%s GOLDEN CROSS at %s -> BUY alert", symbol, idx)
+            subject = f"{symbol} MACD 金叉 信号 - 买入"
+            body = (
+                f"Symbol: {symbol}\nTime: {idx}\n"
+                f"Close: {row['close']:.4f}\nMACD: {row['macd']:.6f}, Signal: {row['signal']:.6f}\n"
+                f"BOLL Mid: {row.get('boll_mid', float('nan')):.4f}, Upper: {row.get('boll_upper', float('nan')):.4f}, Lower: {row.get('boll_lower', float('nan')):.4f}"
+            )
+            send_email_with_attachments(subject, body,[])
+            last_signal = "buy"
 
-        elif cross == "death":
-            if last_signal != "sell":
-                logger.info("%s DEATH CROSS at %s -> SELL alert", symbol, idx)
-                subject = f"{symbol} MACD 死叉 信号 - 卖出"
-                body = (
-                    f"Symbol: {symbol}\nTime: {idx}\n"
-                    f"Close: {row['close']:.4f}\nMACD: {row['macd']:.6f}, Signal: {row['signal']:.6f}\n"
-                    f"BOLL Mid: {row.get('boll_mid', float('nan')):.4f}, Upper: {row.get('boll_upper', float('nan')):.4f}, Lower: {row.get('boll_lower', float('nan')):.4f}"
-                )
-                send_email(subject, body)
-                last_signal = "sell"
+        if cross == "death" and last_signal != "sell":
+            logger.info("%s DEATH CROSS at %s -> SELL alert", symbol, idx)
+            subject = f"{symbol} MACD 死叉 信号 - 卖出"
+            body = (
+                f"Symbol: {symbol}\nTime: {idx}\n"
+                f"Close: {row['close']:.4f}\nMACD: {row['macd']:.6f}, Signal: {row['signal']:.6f}\n"
+                f"BOLL Mid: {row.get('boll_mid', float('nan')):.4f}, Upper: {row.get('boll_upper', float('nan')):.4f}, Lower: {row.get('boll_lower', float('nan')):.4f}"
+            )
+            send_email_with_attachments(subject, body,[])
+            last_signal = "sell"
 
         prev_row = row
 
-    # Update state
     state[symbol] = {
         "last_processed_time": new_df.index[-1].isoformat(),
         "last_signal": last_signal,
     }
     logger.info("state updated for %s -> last_time=%s last_signal=%s", symbol, state[symbol]["last_processed_time"], last_signal)
 
-    # Store latest computed df for plotting (already stored above; keep to ensure newest)
     LATEST_DATA[symbol] = df
 
 
@@ -319,6 +363,8 @@ def plot_symbol(symbol: str, df: pd.DataFrame, window_minutes: Optional[int] = N
         # window slice for recent minutes if specified
         dfp = df
         try:
+            end_ts = None
+            start_ts = None
             if window_minutes is not None and not df.empty:
                 end_ts = df.index.max()
                 start_ts = end_ts - timedelta(minutes=window_minutes)
@@ -348,6 +394,14 @@ def plot_symbol(symbol: str, df: pd.DataFrame, window_minutes: Optional[int] = N
         ax_macd.set_title("MACD")
         ax_macd.legend(loc='upper left')
         ax_macd.grid(True, linestyle='--', alpha=0.3)
+
+        # Ensure x-axis only shows the requested time window when provided
+        if window_minutes is not None and start_ts is not None and end_ts is not None:
+            try:
+                ax_price.set_xlim(start_ts, end_ts)
+                ax_macd.set_xlim(start_ts, end_ts)
+            except Exception:
+                pass
 
         plt.tight_layout()
         final_path = out_path or os.path.join(PLOT_DIR, f"{symbol.replace('.', '_')}.png")
@@ -380,17 +434,17 @@ def main() -> None:
             run_once()
             # every 10 minutes, generate plots and email
             now = datetime.now()
-            if (now - last_plot_email_ts).total_seconds() >= 600 and LATEST_DATA:
+            if (now - last_plot_email_ts).total_seconds() >= 4800 and LATEST_DATA:
                 paths: List[str] = []
                 for sym, df in LATEST_DATA.items():
                     # draw only last 30 minutes for email
                     email_path = os.path.join(PLOT_DIR, f"{sym.replace('.', '_')}_30m.png")
-                    plot_symbol(sym, df, window_minutes=30, out_path=email_path)
+                    plot_symbol(sym, df, window_minutes=60, out_path=email_path)
                     paths.append(email_path)
                 try:
                     send_email_with_attachments(
-                        subject=f"近30分钟图表 {now.strftime('%Y-%m-%d %H:%M')}",
-                        body="附件为各标的近30分钟价格+布林+MACD图。",
+                        subject=f"近60分钟图表 {now.strftime('%Y-%m-%d %H:%M')}",
+                        body="附件为各标的近60分钟价格+布林+MACD图。",
                         attachment_paths=paths,
                     )
                     logger.info("emailed plots (%d attachments)", len(paths))
