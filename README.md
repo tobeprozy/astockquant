@@ -7,7 +7,7 @@
 ```bash
 conda create -n astockquant -c conda-forge -y python=3.10
 conda activate astockquant
-pip install -i https://pypi.tuna.tsinghua.edu.cn/simple akshare pyfolio backtrader
+pip install -i https://pypi.tuna.tsinghua.edu.cn/simple akshare pyfolio backtrader pyecharts TA-Lib
 ```
 
 ## 新的目录约定（逐步迁移中）
@@ -16,7 +16,7 @@ pip install -i https://pypi.tuna.tsinghua.edu.cn/simple akshare pyfolio backtrad
 - `backend/adapters/`: 适配层，将现有实现（如 Akshare 抓取器）包装为统一接口
 - `backend/engines/`: 回测引擎实现（现支持 Backtrader 引擎）
 - `backend/strategies/`: 策略实现（保留 Backtrader 策略）
-- `backend/get_data/`: 旧的数据抓取实现，逐步迁移至 adapters
+- `backend/get_data/`: 旧的数据抓取cona实现，逐步迁移至 adapters
 
 ## 快速上手（新接口）
 

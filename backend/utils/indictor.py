@@ -13,6 +13,7 @@ class StockTAIndicatorsCalculator:
         df -- 包含股票数据的pandas.DataFrame对象，必须包含'High', 'Low', 'Close', 'Volume'列。
         """
         self.df = df.copy()
+        self.df = self.df.reset_index()
 
     def calculate_all_indicators(self):
         """

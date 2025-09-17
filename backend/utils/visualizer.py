@@ -793,6 +793,11 @@ columns_mapping2 = {
 }
 
 
+columns_mapping3 = {
+    'volume': 'vol',
+}
+
+
 from utils.indictor import StockIndicatorsCalculator
 from utils.indictor import StockTAIndicatorsCalculator
 import datetime
@@ -806,9 +811,8 @@ if __name__ == "__main__":
 
     df = provider.fetch(symbol="512200", start_date=s_date, end_date=e_date)
 
-    # 如果是中文列，则进行重命名；否则跳过
-    if '日期' in df.columns:
-        df.rename(columns=columns_mapping2, inplace=True)
+    # 进行重命名；
+    df.columns = df.columns.map(lambda x: columns_mapping3.get(x, x))
 
     calculator = StockTAIndicatorsCalculator(df)
     calculator.cal_ma(timeperiod=5)
