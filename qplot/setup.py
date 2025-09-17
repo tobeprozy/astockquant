@@ -49,6 +49,9 @@ setup(
             'flake8>=3.8.0',
             'black>=20.8b1',
         ],
+        'pyecharts': [
+            'pyecharts>=1.9.0',  # pyecharts绘图库
+        ]
     },
     classifiers=[
         'Development Status :: 3 - Alpha',

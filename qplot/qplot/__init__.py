@@ -35,6 +35,18 @@ from qplot.data_manager import DataManager
 from qplot.plotters.candlestick_plotter import CandlestickPlotter
 from qplot.plotters.minute_plotter import MinutePlotter
 
+# 尝试导入pyecharts相关的绘图器
+try:
+    from qplot.plotters.pyecharts.candlestick_plotter import PyechartsCandlestickPlotter
+    from qplot.plotters.pyecharts.minute_plotter import PyechartsMinutePlotter
+    HAS_PYECHARTS = True
+except ImportError:
+    logger.info("未找到pyecharts库，如需使用pyecharts绘图功能，请安装: pip install qplot[pyecharts]")
+    HAS_PYECHARTS = False
+
+# 全局变量
+default_plot_backend = 'matplotlib'  # 默认绘图后端
+
 # 初始化函数
 def init() -> None:
     """
@@ -49,6 +61,33 @@ def init() -> None:
         # 注册默认的绘图器
         register_plotter('candlestick', CandlestickPlotter)
         register_plotter('minute', MinutePlotter)
+        
+        # 如果pyecharts可用，注册pyecharts绘图器
+        if HAS_PYECHARTS:
+            register_plotter('pyecharts_candlestick', PyechartsCandlestickPlotter)
+            register_plotter('pyecharts_minute', PyechartsMinutePlotter)
+
+# 设置默认绘图后端
+def set_default_plot_backend(backend: str) -> None:
+    """
+    设置默认的绘图后端
+    
+    Args:
+        backend: 绘图后端名称，支持'matplotlib'或'pyecharts'
+    
+    Raises:
+        ValueError: 如果指定的后端不支持
+    """
+    global default_plot_backend
+    
+    if backend not in ['matplotlib', 'pyecharts']:
+        raise ValueError("不支持的绘图后端，仅支持'matplotlib'和'pyecharts'")
+    
+    if backend == 'pyecharts' and not HAS_PYECHARTS:
+        raise ImportError("未找到pyecharts库，请先安装: pip install qplot[pyecharts]")
+    
+    default_plot_backend = backend
+    logger.info(f"已设置默认绘图后端为: {backend}")
 
 # 注册绘图器
 def register_plotter(name: str, plotter_class: type) -> None:
@@ -125,6 +164,7 @@ def plot_kline(symbol: str, start_date: str = None, end_date: str = None, realti
         realtime: 是否启用实时更新
         interval: 实时更新间隔（秒）
         **kwargs: 其他绘图参数
+        - backend: 可选，指定绘图后端，'matplotlib'或'pyecharts'
     """
     # 初始化qplot
     if not _initialized:
@@ -141,12 +181,34 @@ def plot_kline(symbol: str, start_date: str = None, end_date: str = None, realti
     else:
         _data_managers[key].update_data()
     
-    # 绘制K线图
-    if 'candlestick' in _plotters:
-        plotter = _plotters['candlestick']()
-        plotter.plot(_data_managers[key].get_data(), **kwargs)
+    # 选择绘图器
+    backend = kwargs.pop('backend', default_plot_backend)
+    
+    if backend == 'pyecharts':
+        if HAS_PYECHARTS and 'pyecharts_candlestick' in _plotters:
+            plotter = _plotters['pyecharts_candlestick']()
+            chart = plotter.plot(_data_managers[key].get_data(), **kwargs)
+            # 如果是Jupyter环境，可以直接显示图表
+            try:
+                from IPython.display import display
+                display(chart)
+            except ImportError:
+                # 非Jupyter环境，直接返回图表对象
+                pass
+        else:
+            logger.warning("pyecharts绘图器不可用，使用默认的matplotlib绘图器")
+            if 'candlestick' in _plotters:
+                plotter = _plotters['candlestick']()
+                plotter.plot(_data_managers[key].get_data(), **kwargs)
+            else:
+                raise ValueError("未找到candlestick绘图器")
     else:
-        raise ValueError("未找到candlestick绘图器")
+        # 使用默认的matplotlib绘图器
+        if 'candlestick' in _plotters:
+            plotter = _plotters['candlestick']()
+            plotter.plot(_data_managers[key].get_data(), **kwargs)
+        else:
+            raise ValueError("未找到candlestick绘图器")
     
     # 如果启用了实时更新
     if realtime:
@@ -164,6 +226,7 @@ def plot_minute_chart(symbol: str, start_time: str = None, end_time: str = None,
         realtime: 是否启用实时更新
         interval: 实时更新间隔（秒）
         **kwargs: 其他绘图参数
+        - backend: 可选，指定绘图后端，'matplotlib'或'pyecharts'
     """
     # 初始化qplot
     if not _initialized:
@@ -180,12 +243,34 @@ def plot_minute_chart(symbol: str, start_time: str = None, end_time: str = None,
     else:
         _data_managers[key].update_data()
     
-    # 绘制分时图
-    if 'minute' in _plotters:
-        plotter = _plotters['minute']()
-        plotter.plot(_data_managers[key].get_data(), **kwargs)
+    # 选择绘图器
+    backend = kwargs.pop('backend', default_plot_backend)
+    
+    if backend == 'pyecharts':
+        if HAS_PYECHARTS and 'pyecharts_minute' in _plotters:
+            plotter = _plotters['pyecharts_minute']()
+            chart = plotter.plot(_data_managers[key].get_data(), **kwargs)
+            # 如果是Jupyter环境，可以直接显示图表
+            try:
+                from IPython.display import display
+                display(chart)
+            except ImportError:
+                # 非Jupyter环境，直接返回图表对象
+                pass
+        else:
+            logger.warning("pyecharts绘图器不可用，使用默认的matplotlib绘图器")
+            if 'minute' in _plotters:
+                plotter = _plotters['minute']()
+                plotter.plot(_data_managers[key].get_data(), **kwargs)
+            else:
+                raise ValueError("未找到minute绘图器")
     else:
-        raise ValueError("未找到minute绘图器")
+        # 使用默认的matplotlib绘图器
+        if 'minute' in _plotters:
+            plotter = _plotters['minute']()
+            plotter.plot(_data_managers[key].get_data(), **kwargs)
+        else:
+            raise ValueError("未找到minute绘图器")
     
     # 如果启用了实时更新
     if realtime:
