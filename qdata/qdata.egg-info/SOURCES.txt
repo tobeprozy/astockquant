@@ -1,0 +1,15 @@
+README.md
+setup.py
+qdata/__init__.py
+qdata/factory.py
+qdata/provider.py
+qdata.egg-info/PKG-INFO
+qdata.egg-info/SOURCES.txt
+qdata.egg-info/dependency_links.txt
+qdata.egg-info/requires.txt
+qdata.egg-info/top_level.txt
+qdata/providers/__init__.py
+qdata/providers/akshare_provider.py
+qdata/providers/csv_provider.py
+qdata/providers/tushare_provider.py
+tests/test_qdata_api.py
