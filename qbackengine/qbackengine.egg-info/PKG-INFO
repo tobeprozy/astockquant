@@ -1,0 +1,68 @@
+Metadata-Version: 2.4
+Name: qbackengine
+Version: 0.1.0
+Summary: qbackengine - 一个简洁的量化交易回测引擎插件系统
+Home-page: https://github.com/yourusername/qbacktest
+Author: AstockQuant Team
+Author-email: team@astockquant.com
+License: MIT
+Keywords: quantitative trading backtest
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Financial and Insurance Industry
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+Requires-Dist: pandas>=1.0.0
+Requires-Dist: numpy>=1.18.0
+Requires-Dist: qdata>=0.1.0
+Requires-Dist: qstrategy>=0.1.0
+Requires-Dist: backtrader
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: keywords
+Dynamic: license
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+# qbackengine - 量化交易回测引擎
+
+qbackengine是一个简洁而强大的量化交易回测引擎插件系统，支持多种回测引擎和策略。
+
+## 功能特性
+
+- 支持基于backtrader的回测引擎
+- 支持简单事件循环回测引擎
+- 支持多标的回测
+- 提供统一的回测接口
+- 易于扩展和集成
+
+## 安装
+
+```bash
+pip install .
+```
+
+## 使用示例
+
+查看`examples`目录下的`usage_example.py`文件了解如何使用。
+
+## 依赖项
+- pandas>=1.0.0
+- numpy>=1.18.0
+- qdata>=0.1.0
+- qstrategy>=0.1.0
+- backtrader>=1.9.76.123
+
+## 许可证
+MIT License
