@@ -5,7 +5,7 @@
 ## 环境准备
 
 ```bash
-conda create -n astockquant -c conda-forge -y python=3.10
+conda create -n astockquant  -y python=3.10
 conda activate astockquant
 pip install -i https://pypi.tuna.tsinghua.edu.cn/simple akshare pyfolio backtrader pyecharts TA-Lib
 ```
