@@ -12,4 +12,8 @@ qdata/providers/__init__.py
 qdata/providers/akshare_provider.py
 qdata/providers/csv_provider.py
 qdata/providers/tushare_provider.py
+qdata/providers/__pycache__/__init__.cpython-310.pyc
+qdata/providers/__pycache__/akshare_provider.cpython-310.pyc
+qdata/providers/__pycache__/csv_provider.cpython-310.pyc
+qdata/providers/__pycache__/tushare_provider.cpython-310.pyc
 tests/test_qdata_api.py

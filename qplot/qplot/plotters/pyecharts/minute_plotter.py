@@ -210,14 +210,32 @@ class PyechartsMinutePlotter(Plotter):
                 else:
                     raise ValueError(f"数据缺少必要的列: {col}")
         
-        # 计算均价（如果没有的话）
-        if 'avg_price' not in df.columns and show_avg_line:
-            if 'volume' in df.columns and 'amount' in df.columns:
-                # 计算累计成交量和累计成交额
-                cumulative_volume = df['volume'].cumsum()
-                cumulative_amount = df['amount'].cumsum()
-                # 计算均价
-                df['avg_price'] = cumulative_amount / cumulative_volume
+        # 创建Grid布局
+        grid = Grid(
+            init_opts=opts.InitOpts(width="100%", height="100%", theme=theme)
+        )
+        
+        # 添加主图（价格线和均价线）
+        grid.add(
+            main_chart, 
+            grid_opts=opts.GridOpts(
+                pos_left="10%", 
+                pos_right="10%", 
+                height="60%"
+            )
+        )
+        
+        # 添加成交量图
+        if volume_chart is not None:
+            grid.add(
+                volume_chart, 
+                grid_opts=opts.GridOpts(
+                    pos_left="10%", 
+                    pos_right="10%", 
+                    pos_top="75%", 
+                    height="16%"
+                )
+            )
         
         return df
     

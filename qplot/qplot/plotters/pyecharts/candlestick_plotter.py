@@ -94,36 +94,32 @@ class PyechartsCandlestickPlotter(Plotter):
             legend_opts=opts.LegendOpts(is_show=True)
         )
         
-        # 创建网格布局
+        # 创建Grid布局
         grid = Grid(
-            init_opts=opts.InitOpts(width=f"{width}px", height=f"{height}px", theme=kwargs.get('theme', 'white'))
+            init_opts=opts.InitOpts(width="100%", height="100%", theme=theme)
         )
         
-        # 计算布局高度比例
-        if volume:
-            kline_height = 0.7
-            volume_height = 0.3
-        else:
-            kline_height = 1.0
-            volume_height = 0.0
-        
-        # 添加K线图到网格
-        grid.add(kline, grid_opts=opts.GridOpts(height=f"{kline_height * 100}%", top="5%"))
-        
-        # 添加成交量
-        if volume:
-            bar = Bar()
-            bar.add_xaxis(xaxis_data=dates)
-            bar.add_yaxis(
-                series_name="成交量",
-                y_axis=df['volume'].tolist(),
-                itemstyle_opts=opts.ItemStyleOpts(color={"type": "color", "value": "#3370FF"})
+        # 添加K线图和指标线
+        grid.add(
+            kline, 
+            grid_opts=opts.GridOpts(
+                pos_left="10%", 
+                pos_right="10%", 
+                height="60%"
             )
-            bar.set_global_opts(
-                xaxis_opts=opts.AxisOpts(type_="category", boundary_gap=False),
-                yaxis_opts=opts.AxisOpts(is_scale=True)
+        )
+        
+        # 添加成交量图
+        if volume_chart is not None:
+            grid.add(
+                volume_chart, 
+                grid_opts=opts.GridOpts(
+                    pos_left="10%", 
+                    pos_right="10%", 
+                    pos_top="75%", 
+                    height="16%"
+                )
             )
-            grid.add(bar, grid_opts=opts.GridOpts(height=f"{volume_height * 100}%", top=f"{5 + kline_height * 100}%"))
         
         # 添加指标
         if indicators:

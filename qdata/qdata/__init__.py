@@ -5,9 +5,11 @@ qdata - 一个可扩展的股票数据获取插件系统
 """
 
 import logging
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any, Dict, Callable
 import pandas as pd
 from datetime import datetime
+import inspect
+import functools
 
 # 设置日志配置
 logging.basicConfig(
@@ -78,6 +80,30 @@ def set_current_provider(provider_name: str) -> DataProvider:
     logger.info(f"已切换数据源至: {provider_name}")
     
     return _current_provider
+
+# 动态代理函数，将提供者的方法暴露给模块级别
+def __getattr__(name: str) -> Any:
+    # 如果是内置属性或已定义属性，则直接返回
+    if name.startswith('__') or name in globals():
+        raise AttributeError(f"module 'qdata' has no attribute '{name}'")
+        
+    # 确保提供者已初始化
+    provider = get_provider()
+    
+    # 尝试从提供者获取方法
+    if hasattr(provider, name):
+        method = getattr(provider, name)
+        
+        # 确保获取的是可调用方法
+        if callable(method):
+            # 创建包装函数，保留原方法的文档和签名
+            @functools.wraps(method)
+            def wrapper(*args, **kwargs):
+                return method(*args, **kwargs)
+            
+            return wrapper
+    
+    raise AttributeError(f"module 'qdata' has no attribute '{name}'")
 
 # 获取股票日线数据
 def get_daily_data(symbol: str, start_date: str, end_date: str, **kwargs) -> pd.DataFrame:
