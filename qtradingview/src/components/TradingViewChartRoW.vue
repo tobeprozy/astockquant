@@ -59,8 +59,8 @@ const initTradingViewChart = async () => {
       interval: 'D', // 默认时间间隔（日线）
       container_id: 'tv_chart_container',
       
-      // 数据馈送配置 - 修改为本地UDF服务器
-      datafeed: new window.Datafeeds.UDFCompatibleDatafeed('http://localhost:8080'),
+      // 数据馈送配置
+      datafeed: new window.Datafeeds.UDFCompatibleDatafeed('https://demo_feed.tradingview.com'),
       library_path: '/',
       locale: 'zh', // 使用中文界面
       
@@ -68,10 +68,11 @@ const initTradingViewChart = async () => {
       disabled_features: ['use_localstorage_for_settings'],
       enabled_features: ['study_templates'],
       
-      // 禁用图表保存功能，使用本地服务器时不需要
-      charts_storage_url: '',
-      client_id: '',
-      user_id: ''
+      // 保存/加载图表配置
+      charts_storage_url: 'http://saveload.tradingview.com',
+      charts_storage_api_version: '1.1',
+      client_id: 'tradingview.com',
+      user_id: 'public_user_id'
     });
 
   } catch (error) {
