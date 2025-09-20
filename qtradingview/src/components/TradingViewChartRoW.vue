@@ -33,8 +33,7 @@ const loadTradingViewLibraries = () => {
 
     // 依次加载所需的脚本文件
     Promise.all([
-      createScript('/charting_library/charting_library.min.js'),
-      createScript('/datafeeds/udf/dist/polyfills.js'),
+      createScript('/charting_library/charting_library.standalone.js'),
       createScript('/datafeeds/udf/dist/bundle.js')
     ])
       .then(resolve)
@@ -52,16 +51,22 @@ const initTradingViewChart = async () => {
       return;
     }
 
+    // 确保容器元素存在
+    if (!chartContainer.value) {
+      console.error('Chart container not found');
+      return;
+    }
+
     // 创建 TradingView 图表部件
-    widget = new window.TradingView.widget({
+    widget = new TradingView.widget({
       fullscreen: true,
       symbol: 'AAPL', // 默认股票代码
-      interval: 'D', // 默认时间间隔（日线）
-      container_id: 'tv_chart_container',
+      interval: '1D', // 默认时间间隔（日线）
+      container: 'tv_chart_container',
       
       // 数据馈送配置
-      datafeed: new window.Datafeeds.UDFCompatibleDatafeed('https://demo_feed.tradingview.com'),
-      library_path: '/',
+      datafeed: new Datafeeds.UDFCompatibleDatafeed('https://demo-feed-data.tradingview.com'),
+      library_path: '/charting_library/',
       locale: 'zh', // 使用中文界面
       
       // 功能配置

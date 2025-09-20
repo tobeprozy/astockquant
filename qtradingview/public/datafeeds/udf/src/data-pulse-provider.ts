@@ -1,21 +1,14 @@
-import {
-	LibrarySymbolInfo,
-	SubscribeBarsCallback,
-} from '../../../charting_library/datafeed-api';
-
-import {
-	GetBarsResult,
-	HistoryProvider,
-} from './history-provider';
+import { LibrarySymbolInfo, ResolutionString, SubscribeBarsCallback } from '../../../charting_library/datafeed-api';
 
 import {
 	getErrorMessage,
 	logMessage,
 } from './helpers';
+import { IDataPulseProvider, IHistoryProvider, GetBarsResult } from './provider-interfaces';
 
 interface DataSubscriber {
 	symbolInfo: LibrarySymbolInfo;
-	resolution: string;
+	resolution: ResolutionString;
 	lastBarTime: number | null;
 	listener: SubscribeBarsCallback;
 }
@@ -24,17 +17,17 @@ interface DataSubscribers {
 	[guid: string]: DataSubscriber;
 }
 
-export class DataPulseProvider {
+export class DataPulseProvider implements IDataPulseProvider {
 	private readonly _subscribers: DataSubscribers = {};
 	private _requestsPending: number = 0;
-	private readonly _historyProvider: HistoryProvider;
+	private readonly _historyProvider: IHistoryProvider;
 
-	public constructor(historyProvider: HistoryProvider, updateFrequency: number) {
+	public constructor(historyProvider: IHistoryProvider, updateFrequency: number) {
 		this._historyProvider = historyProvider;
 		setInterval(this._updateData.bind(this), updateFrequency);
 	}
 
-	public subscribeBars(symbolInfo: LibrarySymbolInfo, resolution: string, newDataCallback: SubscribeBarsCallback, listenerGuid: string): void {
+	public subscribeBars(symbolInfo: LibrarySymbolInfo, resolution: ResolutionString, newDataCallback: SubscribeBarsCallback, listenerGuid: string): void {
 		if (this._subscribers.hasOwnProperty(listenerGuid)) {
 			logMessage(`DataPulseProvider: already has subscriber with id=${listenerGuid}`);
 			return;
@@ -61,7 +54,8 @@ export class DataPulseProvider {
 		}
 
 		this._requestsPending = 0;
-		for (const listenerGuid in this._subscribers) { // tslint:disable-line:forin
+		// eslint-disable-next-line guard-for-in
+		for (const listenerGuid in this._subscribers) {
 			this._requestsPending += 1;
 			this._updateDataForSubscriber(listenerGuid)
 				.then(() => {
@@ -84,7 +78,15 @@ export class DataPulseProvider {
 		// see the explanation below. `10` is the `large enough` value to work around holidays
 		const rangeStartTime = rangeEndTime - periodLengthSeconds(subscriptionRecord.resolution, 10);
 
-		return this._historyProvider.getBars(subscriptionRecord.symbolInfo, subscriptionRecord.resolution, rangeStartTime, rangeEndTime)
+		return this._historyProvider.getBars(
+			subscriptionRecord.symbolInfo,
+			subscriptionRecord.resolution,
+			{
+				from: rangeStartTime,
+				to: rangeEndTime,
+				countBack: 2,
+				firstDataRequest: false,
+			})
 			.then((result: GetBarsResult) => {
 				this._onSubscriberDataReceived(listenerGuid, result);
 			});
