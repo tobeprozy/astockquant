@@ -33,9 +33,9 @@ const loadTradingViewLibraries = () => {
 
     // 依次加载所需的脚本文件
     Promise.all([
-      createScript('/charting_library.min.js'),
-      createScript('/udf/dist/polyfills.js'),
-      createScript('/udf/dist/bundle.js')
+      createScript('/charting_library/charting_library.min.js'),
+      createScript('/datafeeds/udf/dist/polyfills.js'),
+      createScript('/datafeeds/udf/dist/bundle.js')
     ])
       .then(resolve)
       .catch(reject);

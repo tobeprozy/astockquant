@@ -36,7 +36,7 @@ python simple_udf_server.py 8888
 在另一个终端窗口中，启动Vue应用：
 
 ```bash
-cd /Users/zzy/workspace/AstockQuant/qtradingview
+cd AstockQuant/qtradingview
 npm install
 npm run dev
 ```

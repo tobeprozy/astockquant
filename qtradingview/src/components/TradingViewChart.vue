@@ -33,9 +33,9 @@ const loadTradingViewLibraries = () => {
 
     // 依次加载所需的脚本文件
     Promise.all([
-      createScript('/charting_library.min.js'),
-      createScript('/udf/dist/polyfills.js'),
-      createScript('/udf/dist/bundle.js')
+      createScript('/charting_library/charting_library.min.js'),
+      createScript('/datafeeds/udf/dist/polyfills.js'),
+      createScript('/datafeeds/udf/dist/bundle.js')
     ])
       .then(resolve)
       .catch(reject);
@@ -61,7 +61,7 @@ const initTradingViewChart = async () => {
       
       // 数据馈送配置 - 修改为本地UDF服务器
       datafeed: new window.Datafeeds.UDFCompatibleDatafeed('http://localhost:8080'),
-      library_path: '/',
+      library_path: '/charting_library/',
       locale: 'zh', // 使用中文界面
       
       // 功能配置
