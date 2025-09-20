@@ -42,14 +42,6 @@ const loadTradingViewLibraries = () => {
   });
 };
 
-// 从URL获取参数的函数
-const getParameterByName = (name) => {
-  name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
-  var regex = new RegExp("[\\?&]" + name + "=([^&#]*)");
-  var results = regex.exec(location.search);
-  return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
-};
-
 // 初始化 TradingView 图表
 const initTradingViewChart = async () => {
   try {
@@ -60,25 +52,17 @@ const initTradingViewChart = async () => {
       return;
     }
 
-    // 获取URL参数
-    const symbol = getParameterByName('symbol') || 'AAPL';
-    const interval = getParameterByName('interval') || 'D';
-    const lang = getParameterByName('lang') || 'zh';
-    const theme = getParameterByName('theme') || 'light';
-
     // 创建 TradingView 图表部件
     widget = new window.TradingView.widget({
-      // debug: true, // 取消注释以在控制台中查看库错误和警告
       fullscreen: true,
-      symbol: symbol,
-      interval: interval,
+      symbol: 'AAPL', // 默认股票代码
+      interval: 'D', // 默认时间间隔（日线）
       container_id: 'tv_chart_container',
       
       // 数据馈送配置
       datafeed: new window.Datafeeds.UDFCompatibleDatafeed('https://demo_feed.tradingview.com'),
       library_path: '/',
-      locale: lang,
-      theme: theme,
+      locale: 'zh', // 使用中文界面
       
       // 功能配置
       disabled_features: ['use_localstorage_for_settings'],
@@ -119,14 +103,6 @@ onUnmounted(() => {
 
 #tv_chart_container {
   width: 100%;
-  height: 100vh;
-  margin: 0;
-}
-
-/* 适配移动设备 */
-@media (max-width: 768px) {
-  #tv_chart_container {
-    height: calc(100vh - 40px);
-  }
+  height: 800px;
 }
 </style>
