@@ -1,1 +1,44 @@
+# 操作系统生成的文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE配置文件
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# 包管理文件
+node_modules/
+python_modules/
+*.egg-info/
+__pycache__/
+
+# 日志和缓存
+*.log
+*.log.*
+.cache/
+
+# 构建输出
+build/
+dist/
+
+# 环境变量
+.env
+.env.local
+.env.production
+
+# 测试覆盖率
+coverage/
+.nyc_output/
+
+# 特定语言文件
 *.csv
