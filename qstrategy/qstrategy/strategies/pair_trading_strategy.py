@@ -5,9 +5,9 @@ from typing import Dict, Any
 from types import SimpleNamespace
 
 import backtrader as bt
-from qstrategy.strategy import StrategyBase
+from qstrategy.core.strategy import Strategy
 
-class PairTradingStrategy(StrategyBase):
+class PairTradingStrategy(Strategy):
     """
     配对交易策略实现
     通过分析两只相关股票的价格差异来寻找交易机会

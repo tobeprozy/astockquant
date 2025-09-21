@@ -1,10 +1,12 @@
 """
 配对交易策略使用示例
 展示如何使用qstrategy中的配对交易策略进行回测和信号生成
+
+本示例基于qstrategy的新架构（core和backends模块）
 """
 
 import pandas as pd
-import qstrategy
+from qstrategy.strategies.pair_trading_strategy import PairTradingStrategy
 from datetime import datetime, timedelta
 
 # 设置日志
@@ -20,7 +22,7 @@ def generate_sample_pair_data(days=100):
         days: 生成数据的天数
         
     Returns:
-        tuple: 包含两只相关股票数据的DataFrame元组
+        dict: 包含两只配对股票数据的字典
     """
     # 生成日期序列
     dates = [datetime.now() - timedelta(days=i) for i in range(days-1, -1, -1)]
@@ -36,13 +38,13 @@ def generate_sample_pair_data(days=100):
         'volume': [10000 + i*1000 for i in range(days)]
     }
     
-    # 创建示例数据 - 股票B (与股票A相关但有一些差异)
+    # 创建示例数据 - 股票B（与股票A有相关性但略有差异）
     data_b = {
         'date': dates,
-        'open': [120 + i*0.55 for i in range(days)],
-        'high': [121 + i*0.55 + i%5 for i in range(days)],
-        'low': [119 + i*0.55 - i%3 for i in range(days)],
-        'close': [120 + i*0.55 + (i%2 - 0.5)*1.8 + (i%7 - 3.5)*0.3 for i in range(days)],
+        'open': [120 + i*0.48 for i in range(days)],
+        'high': [121 + i*0.48 + i%5 for i in range(days)],
+        'low': [119 + i*0.48 - i%3 for i in range(days)],
+        'close': [120 + i*0.48 + (i%2 - 0.5)*2 + (i%7 - 3.5)*0.5 for i in range(days)],
         'volume': [12000 + i*1200 for i in range(days)]
     }
     
@@ -54,7 +56,7 @@ def generate_sample_pair_data(days=100):
     df_b['date'] = pd.to_datetime(df_b['date'])
     df_b.set_index('date', inplace=True)
     
-    return df_a, df_b
+    return {'stock_a': df_a, 'stock_b': df_b}
 
 def main():
     """
@@ -63,40 +65,55 @@ def main():
     print("===== 配对交易策略使用示例 =====")
     
     try:
-        # 初始化qstrategy
-        qstrategy.init()
-        
-        # 生成示例配对数据
-        data_a, data_b = generate_sample_pair_data()
+        # 生成示例数据
+        pair_data = generate_sample_pair_data()
         print("股票A数据前5行：")
-        print(data_a.head())
+        print(pair_data['stock_a'].head())
         print("\n股票B数据前5行：")
-        print(data_b.head())
+        print(pair_data['stock_b'].head())
         
-        # 创建并初始化策略
-        # 参数说明：
-        # window: 计算配对关系的窗口大小
-        # zscore_threshold: Z-score阈值，超过时产生交易信号
-        strategy = qstrategy.get_strategy('pair_trading', window=30, zscore_threshold=2.0, printlog=True)
+        # 创建策略实例
+        strategy = PairTradingStrategy(
+                                  lookback_period=30, 
+                                  z_score_threshold=1.5, 
+                                  printlog=True
+        )
         
-        # 注意：配对交易需要两只股票的数据，作为元组传入
-        strategy.init_strategy((data_a, data_b))
+        # 初始化策略数据 - 注意PairTradingStrategy需要'symbol_a'和'symbol_b'键
+        strategy.init_strategy({
+            'symbol_a': pair_data['stock_a'],
+            'symbol_b': pair_data['stock_b']
+        })
         
         # 生成交易信号
         signals = strategy.generate_signals()
-        print(f"\n生成的买入信号数量: {len(signals['buy_signals'])}")
-        print(f"生成的卖出信号数量: {len(signals['sell_signals'])}")
+        print(f"\n生成的配对交易信号数量: {len(signals)}")
         
         # 显示部分信号
-        if len(signals['buy_signals']) > 0:
+        if signals is not None:
             print("\n部分买入信号日期：")
-            print(signals['buy_signals'][:3])
+            buy_signals = signals.get('buy_signals', [])
+            if len(buy_signals) > 0:
+                print(buy_signals[:3])
+                
+            print("\n部分卖出信号日期：")
+            sell_signals = signals.get('sell_signals', [])
+            if len(sell_signals) > 0:
+                print(sell_signals[:3])
         
         # 执行交易
         results = strategy.execute_trade(signals)
         print(f"\n交易执行结果：")
-        print(f"总买入次数: {results['total_buys']}")
-        print(f"总卖出次数: {results['total_sells']}")
+        print(f"总买入交易次数: {results.get('total_buys', 0)}")
+        print(f"总卖出交易次数: {results.get('total_sells', 0)}")
+        print(f"总交易数量: {len(results.get('transactions', []))}")
+        
+        # 策略评估
+        if hasattr(strategy, 'evaluate_performance'):
+            performance = strategy.evaluate_performance(results)
+            print(f"\n策略性能评估：")
+            print(f"收益率: {performance.get('return_rate', 0):.2%}")
+            print(f"最大回撤: {performance.get('max_drawdown', 0):.2%}")
         
         print("\n===== 配对交易策略示例运行完成 =====")
     except Exception as e:

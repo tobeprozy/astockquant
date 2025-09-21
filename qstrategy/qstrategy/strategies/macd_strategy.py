@@ -9,9 +9,9 @@ from typing import Dict, Any
 from types import SimpleNamespace
 
 import qindicator
-from qstrategy.strategy import StrategyBase
+from qstrategy.core.strategy import Strategy
 
-class MACDStrategy(StrategyBase):
+class MACDStrategy(Strategy):
     """
     MACD策略实现
     当MACD线从下向上穿过信号线时买入，当MACD线从上向下穿过信号线时卖出
@@ -35,17 +35,16 @@ class MACDStrategy(StrategyBase):
         super().__init__()
         
         # 创建可通过点表示法访问的参数对象
-        self._params = SimpleNamespace(**self.params)
+        self._params_ns = SimpleNamespace(**self.params)
         
         # 更新参数
         for key, value in kwargs.items():
             if key in self.params:
-                setattr(self._params, key, value)
+                setattr(self._params_ns, key, value)
         
         self.macd = None
         self.signal = None
         self.hist = None
-        self.data = None
         self.signals = None
     
     def init_strategy(self, data: pd.DataFrame, **kwargs):
@@ -56,7 +55,7 @@ class MACDStrategy(StrategyBase):
             data: 用于策略的数据
             **kwargs: 其他参数
         """
-        self.data = data.copy()
+        self.init_data(data)
         
         # 直接使用qindicator计算MACD指标
         # qindicator的calculate_macd需要完整的DataFrame
@@ -64,9 +63,9 @@ class MACDStrategy(StrategyBase):
         # 为了兼容，我们创建一个包含必要列的DataFrame
         macd_df = qindicator.calculate_macd(
             pd.DataFrame({'close': data['close']}),
-            fastperiod=self._params.fast_period,
-            slowperiod=self._params.slow_period,
-            signalperiod=self._params.signal_period
+            fastperiod=self._params_ns.fast_period,
+            slowperiod=self._params_ns.slow_period,
+            signalperiod=self._params_ns.signal_period
         )
         
         self.macd = macd_df['MACD']
@@ -95,9 +94,9 @@ class MACDStrategy(StrategyBase):
             # 直接使用qindicator计算MACD指标
             macd_df = qindicator.calculate_macd(
                 pd.DataFrame({'close': data['close']}),
-                fastperiod=self._params.fast_period,
-                slowperiod=self._params.slow_period,
-                signalperiod=self._params.signal_period
+                fastperiod=self._params_ns.fast_period,
+                slowperiod=self._params_ns.slow_period,
+                signalperiod=self._params_ns.signal_period
             )
             macd = macd_df['MACD']
             signal = macd_df['MACD_SIGNAL']
@@ -151,7 +150,7 @@ class MACDStrategy(StrategyBase):
                 'price': price,
                 'reason': 'MACD金叉信号：MACD线上穿信号线'
             })
-            if self._params.printlog:
+            if self._params_ns.printlog:
                 self.log(f'买入信号: {buy_date}, 价格: {price:.2f}')
         
         for sell_date in signals['sell_signals']:
@@ -162,7 +161,7 @@ class MACDStrategy(StrategyBase):
                 'price': price,
                 'reason': 'MACD死叉信号：MACD线下穿信号线'
             })
-            if self._params.printlog:
+            if self._params_ns.printlog:
                 self.log(f'卖出信号: {sell_date}, 价格: {price:.2f}')
         
         return {
@@ -181,11 +180,11 @@ class MACDStrategy(StrategyBase):
         # 定义内部的backtrader策略类
         class BacktraderMACD(bt.Strategy):
             params = (
-                ('fast_period', self._params.fast_period),
-                ('slow_period', self._params.slow_period),
-                ('signal_period', self._params.signal_period),
-                ('printlog', self._params.printlog),
-                ('size', self._params.size)  # 使用外部传入的交易数量参数
+                ('fast_period', self._params_ns.fast_period),
+                ('slow_period', self._params_ns.slow_period),
+                ('signal_period', self._params_ns.signal_period),
+                ('printlog', self._params_ns.printlog),
+                ('size', self._params_ns.size)  # 使用外部传入的交易数量参数
             )
 
             def __init__(self):

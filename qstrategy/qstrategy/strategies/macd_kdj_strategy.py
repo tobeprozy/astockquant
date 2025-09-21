@@ -10,9 +10,9 @@ from typing import Dict, Any
 from types import SimpleNamespace
 
 import qindicator
-from qstrategy.strategy import StrategyBase
+from qstrategy.core.strategy import Strategy
 
-class MACDKDJStrategy(StrategyBase):
+class MACDKDJStrategy(Strategy):
     """
     MACD+KDJ战法策略实现
     结合MACD和KDJ指标生成交易信号
@@ -51,7 +51,6 @@ class MACDKDJStrategy(StrategyBase):
         self.k = None
         self.d = None
         self.j = None
-        self.data = None
         self.signals = None
     
     def init_strategy(self, data: pd.DataFrame, **kwargs):
@@ -62,7 +61,7 @@ class MACDKDJStrategy(StrategyBase):
             data: 用于策略的数据
             **kwargs: 其他参数
         """
-        self.data = data.copy()
+        super().init_data(data.copy())
         
         # 计算MACD指标
         macd_df = qindicator.calculate_macd(

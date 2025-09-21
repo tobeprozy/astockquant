@@ -1,0 +1,17 @@
+# QStrategy 项目依赖
+
+# 核心依赖
+numpy>=1.21.0
+pandas>=1.3.0
+matplotlib>=3.4.0
+
+# 回测引擎（可选）
+backtrader>=1.9.76.123
+
+# 指标计算
+qindicator>=0.1.0
+
+# 工具库
+logging
+functools
+inspect

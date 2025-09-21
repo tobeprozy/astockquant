@@ -10,9 +10,9 @@ from typing import Dict, Any
 from types import SimpleNamespace
 
 import qindicator
-from qstrategy.strategy import StrategyBase
+from qstrategy.core.strategy import Strategy
 
-class VolatilityBreakoutStrategy(StrategyBase):
+class VolatilityBreakoutStrategy(Strategy):
     """
     波动率突破策略实现
     当价格突破近期波动率上限时买入，当价格跌破近期波动率下限时卖出

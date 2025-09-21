@@ -23,16 +23,49 @@ Dynamic: requires-dist
 Dynamic: summary
 
 
-# qstrategy
+# QStrategy
 
-AstockQuant策略插件系统，提供统一的策略管理和执行接口。
+一个可扩展的股票策略插件系统，提供统一的策略管理和执行接口。
+
+## 架构设计
+
+QStrategy采用模块化架构，将策略核心逻辑与具体实现分离，便于扩展和维护。
+
+### 目录结构
+
+```
+qstrategy/
+├── qstrategy/
+│   ├── __init__.py    # 主模块入口
+│   ├── core/          # 核心组件
+│   │   └── strategy.py # 策略基类定义
+│   └── backends/      # 策略后端实现
+│       ├── __init__.py    # 后端管理
+│       ├── sma_cross.py   # SMA交叉策略
+│       ├── macd.py        # MACD策略
+│       ├── rsi.py         # RSI策略
+│       ├── bbands.py      # 布林带策略
+│       ├── pair_trading.py # 配对交易策略
+│       ├── mean_reversion.py # 均值回归策略
+│       └── turtle.py      # 海龟交易策略
+├── examples/          # 示例代码
+│   └── strategy_examples.py # 策略使用示例
+├── requirements.txt   # 项目依赖
+└── README.md          # 项目说明
+```
+
+### 核心组件
+
+1. **Strategy抽象基类**：定义了策略的基本接口和生命周期
+2. **后端管理模块**：负责策略的注册、获取和管理
+3. **具体策略实现**：实现各种交易策略
 
 ## 功能特点
 
 - 统一的策略接口设计
-- 基于工厂模式的策略管理
-- 支持多种回测框架（默认backtrader）
-- 易于扩展的插件架构
+- 模块化的架构设计，便于扩展
+- 支持多种回测框架（默认simple模式）
+- 自动策略注册机制
 - 丰富的内置策略实现
 
 ## 安装
@@ -40,44 +73,103 @@ AstockQuant策略插件系统，提供统一的策略管理和执行接口。
 ```bash
 cd /Users/zzy/workspace/AstockQuant/qstrategy
 pip install -e .
+pip install -r requirements.txt
 ```
 
-## 使用示例
+## 基本使用
 
 ```python
-import qstrategy
 import pandas as pd
+import qstrategy
 
 # 初始化qstrategy
 qstrategy.init()
 
-# 获取数据
-# ... 假设这里获取了股票数据df ...
+# 加载或生成数据
+data = pd.read_csv('your_data.csv', index_col='date', parse_dates=True)
 
-# 创建回测引擎
-cerebro = qstrategy.create_backtrader_engine()
+# 获取策略实例
+strategy = qstrategy.get_strategy('sma_cross', ma_short=5, ma_long=20)
 
-# 添加数据
-cerebro.adddata(df)
+# 初始化策略数据
+strategy.init_data(data)
 
-# 添加策略
-cerebro.addstrategy('sma_cross')
+# 计算指标
+indicators_data = strategy.calculate_indicators()
 
-# 运行回测
-result = cerebro.run()
+# 生成交易信号
+signals = strategy.generate_signals()
 
-# 查看结果
-cerebro.plot()
+# 执行交易
+trade_result = strategy.execute_trade()
+
+# 打印结果
+print(f"交易次数: {trade_result['num_trades']}")
+print(f"总利润: {trade_result['total_profit']:.2f}")
 ```
 
-## 支持的策略
+## 使用示例
 
-- SMA Cross Strategy（均线交叉策略）
-- MACD Strategy（MACD指标策略）
-- RSI Strategy（RSI指标策略）
-- Turtle Strategy（海龟交易策略）
-- Pair Trading Strategy（配对交易策略）
+查看 `examples/strategy_examples.py` 文件，了解如何使用不同的策略。
 
-## 扩展指南
+```bash
+python examples/strategy_examples.py
+```
 
-要添加自定义策略，请继承`qstrategy.StrategyBase`基类并实现必要的方法，然后通过`qstrategy.register_strategy`方法注册您的策略。
+## 可用策略
+
+1. **sma_cross** - SMA交叉策略
+2. **macd** - MACD策略
+3. **rsi** - RSI策略
+4. **bbands** - 布林带策略
+5. **pair_trading** - 配对交易策略
+6. **mean_reversion** - 均值回归策略
+7. **turtle** - 海龟交易策略
+
+## 创建自定义策略
+
+要创建自定义策略，您需要：
+
+1. 创建一个继承自 `Strategy` 的类
+2. 实现必要的方法（`calculate_indicators`, `generate_signals`, `execute_trade`）
+3. 使用 `register_strategy` 函数注册您的策略
+
+示例：
+
+```python
+from qstrategy.core.strategy import Strategy
+from qstrategy.backends import register_strategy
+
+class MyStrategy(Strategy):
+    def __init__(self, **kwargs):
+        default_params = {'param1': 10, 'param2': 20}
+        default_params.update(kwargs)
+        super().__init__(**default_params)
+        
+    def calculate_indicators(self):
+        # 实现指标计算逻辑
+        pass
+        
+    def generate_signals(self):
+        # 实现信号生成逻辑
+        pass
+        
+    def execute_trade(self):
+        # 实现交易执行逻辑
+        pass
+
+# 注册策略
+register_strategy('my_strategy', MyStrategy)
+```
+
+## 依赖
+
+- numpy: 用于数值计算
+- pandas: 用于数据处理
+- matplotlib: 用于结果可视化
+- backtrader (可选): 用于高级回测功能
+- qindicator: 用于技术指标计算
+
+## 版本
+
+当前版本: 0.1.0

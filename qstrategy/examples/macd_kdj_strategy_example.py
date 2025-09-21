@@ -1,10 +1,12 @@
 """
 MACD+KDJ策略使用示例
 展示如何使用qstrategy中的MACD+KDJ策略进行回测和信号生成
+
+本示例基于qstrategy的新架构（core和backends模块）
 """
 
 import pandas as pd
-import qstrategy
+from qstrategy.strategies.macd_kdj_strategy import MACDKDJStrategy
 from datetime import datetime, timedelta
 
 # 设置日志
@@ -48,23 +50,13 @@ def main():
     print("===== MACD+KDJ策略使用示例 =====")
     
     try:
-        # 初始化qstrategy
-        qstrategy.init()
-        
         # 生成示例数据
         data = generate_sample_data()
         print("原始数据前5行：")
         print(data.head())
         
-        # 创建并初始化策略
-        # 参数说明：
-        # macd_fast_period: MACD快线周期
-        # macd_slow_period: MACD慢线周期
-        # macd_signal_period: MACD信号线周期
-        # kdj_period: KDJ周期
-        # kdj_slowing_period: KDJ平滑周期
-        strategy = qstrategy.get_strategy(
-            'macd_kdj', 
+        # 创建策略实例
+        strategy = MACDKDJStrategy(
             macd_fast_period=12, 
             macd_slow_period=26, 
             macd_signal_period=9, 
@@ -72,6 +64,8 @@ def main():
             kdj_slowing_period=3,
             printlog=True
         )
+        
+        # 初始化策略数据
         strategy.init_strategy(data)
         
         # 生成交易信号
@@ -99,6 +93,13 @@ def main():
             print("\n部分交易详情：")
             for i, tx in enumerate(results['transactions'][:3]):
                 print(f"交易{i+1}: {tx['date']} - {tx['type']} @ {tx['price']:.2f} - {tx['reason']}")
+        
+        # 策略评估
+        if hasattr(strategy, 'evaluate_performance'):
+            performance = strategy.evaluate_performance(results)
+            print(f"\n策略性能评估：")
+            print(f"收益率: {performance.get('return_rate', 0):.2%}")
+            print(f"最大回撤: {performance.get('max_drawdown', 0):.2%}")
         
         print("\n===== MACD+KDJ策略示例运行完成 =====")
     except Exception as e:

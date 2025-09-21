@@ -7,10 +7,10 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Any
 
-from qstrategy.strategy import StrategyBase
+from qstrategy.core.strategy import Strategy
 import qindicator
 
-class BBandsStrategy(StrategyBase):
+class BBandsStrategy(Strategy):
     """
     布林带策略实现
     当价格触及下轨时买入，当价格触及上轨时卖出
@@ -39,7 +39,6 @@ class BBandsStrategy(StrategyBase):
         self.upper = None
         self.middle = None
         self.lower = None
-        self.data = None
         self.signals = None
     
     def init_strategy(self, data: pd.DataFrame, **kwargs):
@@ -50,7 +49,7 @@ class BBandsStrategy(StrategyBase):
             data: 用于策略的数据
             **kwargs: 其他参数
         """
-        self.data = data.copy()
+        self.init_data(data)
         
         # 使用指标适配器计算布林带指标
         bbands_result = qindicator.calculate_bbands(

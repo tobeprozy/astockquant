@@ -1,10 +1,12 @@
 """
 MACD策略使用示例
 展示如何使用qstrategy中的MACD策略进行回测和信号生成
+
+本示例基于qstrategy的新架构（core和backends模块）
 """
 
 import pandas as pd
-import qstrategy
+from qstrategy.strategies.macd_strategy import MACDStrategy
 from datetime import datetime, timedelta
 
 # 设置日志
@@ -48,20 +50,20 @@ def main():
     print("===== MACD策略使用示例 =====")
     
     try:
-        # 初始化qstrategy
-        qstrategy.init()
-        
         # 生成示例数据
         data = generate_sample_data()
         print("原始数据前5行：")
         print(data.head())
         
-        # 创建并初始化策略
-        # 参数说明：
-        # fastperiod: 快线周期
-        # slowperiod: 慢线周期
-        # signalperiod: 信号线周期
-        strategy = qstrategy.get_strategy('macd', fastperiod=12, slowperiod=26, signalperiod=9, printlog=True)
+        # 创建策略实例
+        strategy = MACDStrategy(
+                                  fastperiod=12, 
+                                  slowperiod=26, 
+                                  signalperiod=9, 
+                                  printlog=True
+        )
+        
+        # 初始化策略数据
         strategy.init_strategy(data)
         
         # 生成交易信号
@@ -79,6 +81,13 @@ def main():
         print(f"\n交易执行结果：")
         print(f"总买入次数: {results['total_buys']}")
         print(f"总卖出次数: {results['total_sells']}")
+        
+        # 策略评估
+        if hasattr(strategy, 'evaluate_performance'):
+            performance = strategy.evaluate_performance(results)
+            print(f"\n策略性能评估：")
+            print(f"收益率: {performance.get('return_rate', 0):.2%}")
+            print(f"最大回撤: {performance.get('max_drawdown', 0):.2%}")
         
         print("\n===== MACD策略示例运行完成 =====")
     except Exception as e:

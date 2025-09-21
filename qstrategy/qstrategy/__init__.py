@@ -28,29 +28,49 @@ _initialized = False
 _current_engine = None
 
 # 导入必要的模块
-from qstrategy.strategy import StrategyBase
-from qstrategy.factory import StrategyFactory
-# 导入strategies模块以确保策略注册
-import qstrategy.strategies
+from qstrategy.core.strategy import Strategy
+from qstrategy.backends import (
+    register_strategy as _register_strategy,
+    get_strategy as _get_strategy,
+    get_available_strategies as _get_available_strategies,
+    _auto_register_strategies
+)
+
+# 直接导入策略类，方便用户直接使用
+from qstrategy.strategies.bbands_strategy import BBandsStrategy
+from qstrategy.strategies.macd_strategy import MACDStrategy
+from qstrategy.strategies.rsi_strategy import RSIStrategy
+from qstrategy.strategies.macd_kdj_strategy import MACDKDJStrategy
+from qstrategy.strategies.mean_reversion_strategy import MeanReversionStrategy
+from qstrategy.strategies.volatility_breakout_strategy import VolatilityBreakoutStrategy
+from qstrategy.strategies.pair_trading_strategy import PairTradingStrategy
+
+# 自动注册内置策略
+_auto_register_strategies()
 
 # 初始化函数
-def init(engine_type: str = 'backtrader') -> None:
+def init(engine_type: str = 'simple') -> None:
     """
     初始化qstrategy插件
     
     参数:
-        engine_type: 回测引擎类型，默认为'backtrader'
+        engine_type: 回测引擎类型，默认为'simple'
     """
     global _initialized, _current_engine
     
     _initialized = True
     
     # 创建并设置默认回测引擎
-    _current_engine = create_backtrader_engine() if engine_type == 'backtrader' else None
-    logger.info(f"已自动初始化{engine_type}回测引擎")
+    if engine_type == 'backtrader':
+        _current_engine = create_backtrader_engine()
+    else:
+        _current_engine = None
+        
+    logger.info(f"已初始化qstrategy插件，引擎类型: {engine_type}")
+    logger.info(f"可用策略: {', '.join(_get_available_strategies())}")
 
 # 获取当前策略
-def get_strategy(name: str = None, **kwargs) -> StrategyBase:
+def get_strategy(name: str = None, **kwargs) -> Strategy:
     """
     获取指定名称的策略实例或当前策略
     
@@ -65,7 +85,7 @@ def get_strategy(name: str = None, **kwargs) -> StrategyBase:
     
     if name is not None:
         # 创建并设置指定名称的策略
-        _current_strategy = StrategyFactory.create_strategy(name, **kwargs)
+        _current_strategy = _get_strategy(name, **kwargs)
         logger.info(f"已切换至策略: {name}")
     elif _current_strategy is None:
         # 如果还没有初始化策略，则初始化默认策略
@@ -73,9 +93,9 @@ def get_strategy(name: str = None, **kwargs) -> StrategyBase:
             init()
         
         # 获取可用的第一个策略
-        available_strategies = StrategyFactory.get_available_strategies()
+        available_strategies = _get_available_strategies()
         if available_strategies:
-            _current_strategy = StrategyFactory.create_strategy(available_strategies[0])
+            _current_strategy = _get_strategy(available_strategies[0])
             logger.info(f"已自动选择默认策略: {available_strategies[0]}")
         else:
             logger.warning("没有可用的策略")
@@ -83,7 +103,7 @@ def get_strategy(name: str = None, **kwargs) -> StrategyBase:
     return _current_strategy
 
 # 注册自定义策略
-def register_strategy(name: str, strategy_class: Type[StrategyBase]) -> None:
+def register_strategy(name: str, strategy_class: Type[Strategy]) -> None:
     """
     注册自定义策略
     
@@ -91,7 +111,7 @@ def register_strategy(name: str, strategy_class: Type[StrategyBase]) -> None:
         name: 策略名称
         strategy_class: 策略类
     """
-    StrategyFactory.register_strategy(name, strategy_class)
+    _register_strategy(name, strategy_class)
 
 # 创建backtrader回测引擎
 def create_backtrader_engine() -> Any:
@@ -143,7 +163,8 @@ def add_strategy_to_engine(engine: Any, strategy_name: str, **kwargs) -> None:
         **kwargs: 传递给策略的参数
     """
     try:
-        strategy_class = StrategyFactory.get_strategy_class(strategy_name)
+        from qstrategy.backends import get_strategy_class
+        strategy_class = get_strategy_class(strategy_name)
         if strategy_class:
             engine.addstrategy(strategy_class, **kwargs)
         else:

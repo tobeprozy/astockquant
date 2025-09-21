@@ -9,9 +9,9 @@ from typing import Dict, Any
 from types import SimpleNamespace
 
 import qindicator
-from qstrategy.strategy import StrategyBase
+from qstrategy.core.strategy import Strategy
 
-class MeanReversionStrategy(StrategyBase):
+class MeanReversionStrategy(Strategy):
     """
     均值回归策略实现
     当价格低于均值一定标准差时买入，当价格高于均值一定标准差时卖出

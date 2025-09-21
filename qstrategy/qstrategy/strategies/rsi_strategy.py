@@ -9,9 +9,9 @@ from typing import Dict, Any
 from types import SimpleNamespace
 
 import qindicator
-from qstrategy.strategy import StrategyBase
+from qstrategy.core.strategy import Strategy
 
-class RSIStrategy(StrategyBase):
+class RSIStrategy(Strategy):
     """
     RSI策略实现
     当RSI低于超卖阈值时买入，当RSI高于超买阈值时卖出
@@ -43,7 +43,6 @@ class RSIStrategy(StrategyBase):
                 setattr(self._params, key, value)
         
         self.rsi = None
-        self.data = None
         self.signals = None
 
     def init_strategy(self, data: pd.DataFrame, **kwargs):
@@ -54,7 +53,7 @@ class RSIStrategy(StrategyBase):
             data: 用于策略的数据
             **kwargs: 其他参数
         """
-        self.data = data.copy()
+        super().init_data(data.copy())
         
         # 直接使用qindicator计算RSI指标
         rsi_df = qindicator.calculate_rsi(

@@ -1,10 +1,12 @@
 """
 移动平均线交叉策略使用示例
 展示如何使用qstrategy中的移动平均线交叉策略进行回测和信号生成
+
+本示例基于qstrategy的新架构（core和backends模块）
 """
 
 import pandas as pd
-import qstrategy
+from qstrategy.backends.sma_cross import SMACrossStrategy
 from datetime import datetime, timedelta
 
 # 设置日志
@@ -74,20 +76,20 @@ def main():
     print("===== 移动平均线交叉策略使用示例 =====")
     
     try:
-        # 初始化qstrategy
-        qstrategy.init()
-        
         # 生成示例数据
         data = generate_sample_data()
         print("原始数据前5行：")
         print(data.head())
         
-        # 创建并初始化策略
-        # 参数说明：
-        # fast_period: 快线周期
-        # slow_period: 慢线周期
-        strategy = qstrategy.get_strategy('sma_cross', fast_period=5, slow_period=20, printlog=True)
-        strategy.init_strategy(data)
+        # 创建策略实例
+        strategy = SMACrossStrategy(
+            fast_period=5, 
+            slow_period=20, 
+            printlog=True
+        )
+        
+        # 初始化策略数据
+        strategy.init_data(data)
         
         # 生成交易信号
         signals = strategy.generate_signals()
@@ -100,10 +102,18 @@ def main():
             print(signals['buy_signals'][:3])
         
         # 执行交易
-        results = strategy.execute_trade(signals)
+        results = strategy.execute_trade()
         print(f"\n交易执行结果：")
-        print(f"总买入次数: {results['total_buys']}")
-        print(f"总卖出次数: {results['total_sells']}")
+        print(f"总交易次数: {results['num_trades']}")
+        print(f"总利润: {results['total_profit']:.2f}")
+        print(f"最终持仓: {'有持仓' if results['final_position'] > 0 else '空仓'}")
+        
+        # 策略评估
+        if hasattr(strategy, 'evaluate_performance'):
+            performance = strategy.evaluate_performance(results)
+            print(f"\n策略性能评估：")
+            print(f"收益率: {performance.get('return_rate', 0):.2%}")
+            print(f"最大回撤: {performance.get('max_drawdown', 0):.2%}")
         
         print("\n===== 移动平均线交叉策略示例运行完成 =====")
     except Exception as e:
