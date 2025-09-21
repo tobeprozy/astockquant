@@ -1,0 +1,15 @@
+# 基本依赖（matplotlib后端）
+pandas>=1.0.0
+numpy>=1.18.0
+matplotlib>=3.3.0
+mplfinance>=0.12.7a17
+qdata>=0.1.0
+
+# pyecharts后端依赖（可选）
+# pyecharts>=1.9.0
+# js2py>=0.70
+
+# 开发依赖（可选）
+# pytest>=6.0.0
+# flake8>=3.8.0
+# black>=20.8b1
