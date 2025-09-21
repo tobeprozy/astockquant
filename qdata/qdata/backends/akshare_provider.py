@@ -1,4 +1,7 @@
-import os
+"""
+AkShare数据源后端
+使用akshare库获取股票和ETF数据
+"""
 import sys
 import time
 from typing import Optional
@@ -6,6 +9,7 @@ import pandas as pd
 import akshare as ak
 
 from qdata.provider import DataProvider
+from qdata.backends import register_backend
 
 
 class AkShareProvider(DataProvider):
@@ -25,7 +29,7 @@ class AkShareProvider(DataProvider):
         self.retry_count = retry_count
         self.retry_delay = retry_delay or [1, 2, 4, 8, 10]
     
-    def get_daily_data(self, symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
+    def get_daily_data(self, symbol: str, start_date: str, end_date: str, **kwargs) -> pd.DataFrame:
         """
         获取日线数据
         
@@ -33,6 +37,7 @@ class AkShareProvider(DataProvider):
             symbol: 证券代码
             start_date: 开始日期，格式为'YYYY-MM-DD'
             end_date: 结束日期，格式为'YYYY-MM-DD'
+            **kwargs: 额外参数
             
         Returns:
             DataFrame: 包含开盘价、最高价、最低价、收盘价、成交量等数据的DataFrame
@@ -84,7 +89,7 @@ class AkShareProvider(DataProvider):
             f"获取数据失败: {symbol} (从 {start_date} 到 {end_date})"
         ) from last_err
     
-    def get_minute_data(self, symbol: str, start_time: str, end_time: str, frequency: str = '1') -> pd.DataFrame:
+    def get_minute_data(self, symbol: str, start_time: str, end_time: str, frequency: str = '1', **kwargs) -> pd.DataFrame:
         """
         获取分时数据
         
@@ -93,6 +98,7 @@ class AkShareProvider(DataProvider):
             start_time: 开始时间，格式为'YYYY-MM-DD HH:MM:SS'或'YYYY-MM-DD'
             end_time: 结束时间，格式为'YYYY-MM-DD HH:MM:SS'或'YYYY-MM-DD'
             frequency: 时间频率，例如'1'表示1分钟，'5'表示5分钟等
+            **kwargs: 额外参数
             
         Returns:
             DataFrame: 包含开盘价、最高价、最低价、收盘价、成交量等数据的DataFrame
@@ -137,7 +143,7 @@ class AkShareProvider(DataProvider):
             f"获取分钟数据失败: {symbol} (从 {start_time} 到 {end_time}, 频率: {frequency}分钟)"
         ) from last_err
     
-    def get_stock_list(self) -> pd.DataFrame:
+    def get_stock_list(self, **kwargs) -> pd.DataFrame:
         """
         获取股票列表
         
@@ -162,7 +168,7 @@ class AkShareProvider(DataProvider):
         
         raise RuntimeError("获取股票列表失败")
     
-    def get_etf_list(self) -> pd.DataFrame:
+    def get_etf_list(self, **kwargs) -> pd.DataFrame:
         """
         获取ETF列表
         
@@ -234,6 +240,7 @@ class AkShareProvider(DataProvider):
         available_columns = [col for col in required_columns if col in df.columns]
         return df[available_columns]
 
-# 注册到工厂
-from ..factory import DataProviderFactory
-DataProviderFactory.register('akshare', AkShareProvider)
+# 注册后端
+register_backend('akshare', AkShareProvider)
+
+__all__ = ['AkShareProvider']

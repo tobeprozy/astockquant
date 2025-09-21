@@ -8,11 +8,11 @@ import qdata
 import pandas as pd
 
 # 示例1：基本使用（自动初始化，使用默认的akshare数据源）
-print("示例1：基本使用")
-df = qdata.get_daily_data('600000', '2023-01-01', '2023-06-30')
-print(f"获取到的日线数据形状: {df.shape}")
-print(df.head())
-print()
+# print("示例1：基本使用")
+# df = qdata.get_daily_data('600000', '2023-01-01', '2023-06-30')
+# print(f"获取到的日线数据形状: {df.shape}")
+# print(df.head())
+# print()
 
 # 示例2：手动初始化
 print("示例2：手动初始化")
