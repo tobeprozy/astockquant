@@ -3,14 +3,14 @@
 
 """pyecharts K线图和MACD示例
 
-展示如何使用qplot的PyechartsCandlestickPlotter类中的draw_klines、drawMACD和drawAll函数
+展示如何使用qplot的重构后API绘制包含MACD指标的K线图
 """
 
 import pandas as pd
 import numpy as np
 import logging
 import os
-from qplot.plotters.pyecharts.candlestick_plotter import PyechartsCandlestickPlotter
+from qplot import DataManager, plot_kline
 
 # 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -65,20 +65,15 @@ def main():
         data = generate_sample_data()
         logger.info(f"生成了{len(data)}行数据")
         
-        # 创建绘图器实例
-        plotter = PyechartsCandlestickPlotter()
-        
-        # 绘制K线图
-        logger.info("正在绘制K线图...")
-        kline_chart = plotter.draw_klines(data)
-        
-        # 绘制MACD图
-        logger.info("正在绘制MACD图...")
-        macd_chart = plotter.drawMACD(data)
-        
-        # 组合绘制K线图和MACD图
-        logger.info("正在组合绘制K线图和MACD图...")
-        combined_chart = plotter.drawAll(kline_chart, macd_chart)
+        # 绘制包含MACD的K线图（直接传递数据）
+        logger.info("正在绘制包含MACD指标的K线图...")
+        chart = plot_kline(
+            data=data,  # 直接传递数据
+            backend='pyecharts',  # 指定使用pyecharts后端
+            show_volume=True,     # 显示成交量
+            show_macd=True,       # 启用MACD指标显示
+            title='贵州茅台K线图与MACD指标'
+        )
         
         # 创建output目录（如果不存在）
         output_dir = os.path.join(os.path.dirname(__file__), 'output')
@@ -86,9 +81,11 @@ def main():
         
         # 保存图表到output目录
         output_path = os.path.join(output_dir, 'pyecharts_kline_macd_example.html')
-        combined_chart.render(output_path)
+        chart.save(output_path)
         logger.info(f"图表已保存到: {output_path}")
         
+        # 显示图表（可选）
+        # chart.show()
         
     except Exception as e:
         logger.error(f"绘制图表时出错: {e}")
