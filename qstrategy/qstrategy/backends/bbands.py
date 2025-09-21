@@ -40,7 +40,6 @@ class BBANDSStrategy(Strategy):
             'timeperiod': 20,
             'nbdevup': 2,
             'nbdevdn': 2,
-            'matype': 0,
             'printlog': False,
             'size': 100
         }
@@ -76,15 +75,13 @@ class BBANDSStrategy(Strategy):
         timeperiod = self.params.get('timeperiod', 20)
         nbdevup = self.params.get('nbdevup', 2)
         nbdevdn = self.params.get('nbdevdn', 2)
-        matype = self.params.get('matype', 0)
         
         # 计算布林带
         bbands_result = qindicator.calculate_bbands(
             self.data, 
             timeperiod=timeperiod,
             nbdevup=nbdevup,
-            nbdevdn=nbdevdn,
-            matype=matype
+            nbdevdn=nbdevdn
         )
         
         # 保存结果

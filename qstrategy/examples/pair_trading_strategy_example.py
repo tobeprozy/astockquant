@@ -6,7 +6,7 @@
 """
 
 import pandas as pd
-from qstrategy.strategies.pair_trading_strategy import PairTradingStrategy
+import qstrategy
 from datetime import datetime, timedelta
 
 # 设置日志
@@ -73,17 +73,14 @@ def main():
         print(pair_data['stock_b'].head())
         
         # 创建策略实例
-        strategy = PairTradingStrategy(
-                                  lookback_period=30, 
-                                  z_score_threshold=1.5, 
+        strategy = qstrategy.get_strategy('PairTrading',
+                                  lookback_period=30,
+                                  z_score_threshold=1.5,
                                   printlog=True
         )
         
-        # 初始化策略数据 - 注意PairTradingStrategy需要'symbol_a'和'symbol_b'键
-        strategy.init_strategy({
-            'symbol_a': pair_data['stock_a'],
-            'symbol_b': pair_data['stock_b']
-        })
+        # 初始化策略数据 - 注意PairTradingStrategy需要两只股票的数据
+        strategy.init_data({'stock_a': pair_data['stock_a'], 'stock_b': pair_data['stock_b']})
         
         # 生成交易信号
         signals = strategy.generate_signals()
@@ -102,11 +99,11 @@ def main():
                 print(sell_signals[:3])
         
         # 执行交易
-        results = strategy.execute_trade(signals)
+        results = strategy.execute_trade()
         print(f"\n交易执行结果：")
-        print(f"总买入交易次数: {results.get('total_buys', 0)}")
-        print(f"总卖出交易次数: {results.get('total_sells', 0)}")
-        print(f"总交易数量: {len(results.get('transactions', []))}")
+        print(f"总交易次数: {results.get('num_trades', 0)}")
+        print(f"总利润: {results.get('total_profit', 0):.2f}")
+        print(f"总交易数量: {len(results.get('trades', []))}")
         
         # 策略评估
         if hasattr(strategy, 'evaluate_performance'):

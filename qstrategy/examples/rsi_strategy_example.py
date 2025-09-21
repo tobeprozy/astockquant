@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """
 RSI策略使用示例
 展示如何使用qstrategy中的RSI策略进行回测和信号生成
@@ -6,7 +8,7 @@ RSI策略使用示例
 """
 
 import pandas as pd
-from qstrategy.strategies.rsi_strategy import RSIStrategy
+import qstrategy
 from datetime import datetime, timedelta
 
 # 设置日志
@@ -56,7 +58,7 @@ def main():
         print(data.head())
         
         # 创建策略实例
-        strategy = RSIStrategy(
+        strategy = qstrategy.get_strategy('rsi',
                                   period=14, 
                                   overbought=70, 
                                   oversold=30, 
@@ -64,7 +66,7 @@ def main():
         )
         
         # 初始化策略数据
-        strategy.init_strategy(data)
+        strategy.init_data(data)
         
         # 生成交易信号
         signals = strategy.generate_signals()
@@ -77,10 +79,10 @@ def main():
             print(signals['buy_signals'][:3])
         
         # 执行交易
-        results = strategy.execute_trade(signals)
+        results = strategy.execute_trade()
         print(f"\n交易执行结果：")
-        print(f"总买入次数: {results['total_buys']}")
-        print(f"总卖出次数: {results['total_sells']}")
+        print(f"总交易次数: {results['num_trades']}")
+        print(f"总利润: {results['total_profit']:.2f}")
         
         # 策略评估
         if hasattr(strategy, 'evaluate_performance'):

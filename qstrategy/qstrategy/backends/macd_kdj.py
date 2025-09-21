@@ -53,7 +53,7 @@ class MACDKDJStrategy(Strategy):
             self.qindicator = qindicator
         except ImportError:
             logger.error("无法导入qindicator模块")
-            raise StrategyError("无法导入qindicator模块")
+            raise ValueError("无法导入qindicator模块")
         
         # 初始化指标属性
         self.macd = None
@@ -63,32 +63,35 @@ class MACDKDJStrategy(Strategy):
         self.d = None
         self.j = None
     
-    def _calculate_kdj(self, data: pd.DataFrame) -> Dict[str, pd.Series]:
+    def _calculate_kdj(self) -> Dict[str, pd.Series]:
         """
         计算KDJ指标
-        
-        Args:
-            data: 用于计算KDJ指标的数据
         
         Returns:
             包含K、D、J线的字典
         """
         try:
+            if self.data is None:
+                raise ValueError("策略数据未初始化，请先调用init_data方法")
+                
+            # 获取KDJ周期参数
+            kdj_period = self.params.get('kdj_period')
+            
             # 计算RSV值
-            low_min = data['low'].rolling(window=self.params.kdj_period).min()
-            high_max = data['high'].rolling(window=self.params.kdj_period).max()
-            rsv = (data['close'] - low_min) / (high_max - low_min) * 100
+            low_min = self.data['low'].rolling(window=kdj_period).min()
+            high_max = self.data['high'].rolling(window=kdj_period).max()
+            rsv = (self.data['close'] - low_min) / (high_max - low_min) * 100
             
             # 计算K值
-            k = pd.Series(0.0, index=data.index)
-            k.iloc[self.params.kdj_period - 1] = 50.0  # 初始值
-            for i in range(self.params.kdj_period, len(data)):
+            k = pd.Series(0.0, index=self.data.index)
+            k.iloc[kdj_period - 1] = 50.0  # 初始值
+            for i in range(kdj_period, len(self.data)):
                 k.iloc[i] = (2/3) * k.iloc[i-1] + (1/3) * rsv.iloc[i]
             
             # 计算D值
-            d = pd.Series(0.0, index=data.index)
-            d.iloc[self.params.kdj_period - 1] = 50.0  # 初始值
-            for i in range(self.params.kdj_period, len(data)):
+            d = pd.Series(0.0, index=self.data.index)
+            d.iloc[kdj_period - 1] = 50.0  # 初始值
+            for i in range(kdj_period, len(self.data)):
                 d.iloc[i] = (2/3) * d.iloc[i-1] + (1/3) * k.iloc[i]
             
             # 计算J值
@@ -101,33 +104,33 @@ class MACDKDJStrategy(Strategy):
             }
         except Exception as e:
             logger.error(f"计算KDJ指标失败: {str(e)}")
-            raise StrategyError(f"计算KDJ指标失败: {str(e)}")
+            raise ValueError(f"计算KDJ指标失败: {str(e)}")
     
-    def calculate_indicators(self, data: pd.DataFrame) -> Dict[str, Any]:
+    def calculate_indicators(self) -> Dict[str, Any]:
         """
         计算MACD+KDJ策略的指标
-        
-        Args:
-            data: 用于计算指标的数据
         
         Returns:
             包含指标计算结果的字典
         """
         try:
+            if self.data is None:
+                raise ValueError("策略数据未初始化，请先调用init_data方法")
+                
             # 计算MACD指标
             macd_df = self.qindicator.calculate_macd(
-                data, 
-                fast_period=self.params.macd_fast_period, 
-                slow_period=self.params.macd_slow_period,
-                signal_period=self.params.macd_signal_period
+                self.data, 
+                fastperiod=self.params.get('macd_fast_period'), 
+                slowperiod=self.params.get('macd_slow_period'),
+                signalperiod=self.params.get('macd_signal_period')
             )
             
             self.macd = macd_df['MACD']
-            self.macd_signal = macd_df['Signal']
-            self.macd_hist = macd_df['Histogram']
+            self.macd_signal = macd_df['MACD_SIGNAL']
+            self.macd_hist = macd_df['MACD_HIST']
             
             # 计算KDJ指标
-            kdj_result = self._calculate_kdj(data)
+            kdj_result = self._calculate_kdj()
             self.k = kdj_result['k']
             self.d = kdj_result['d']
             self.j = kdj_result['j']
@@ -142,24 +145,22 @@ class MACDKDJStrategy(Strategy):
             }
         except Exception as e:
             logger.error(f"计算指标失败: {str(e)}")
-            raise StrategyError(f"计算指标失败: {str(e)}")
+            raise ValueError(f"计算指标失败: {str(e)}")
     
-    def generate_signals(self, data: pd.DataFrame, indicators: Dict[str, Any] = None) -> Dict[str, Any]:
+    def generate_signals(self) -> Dict[str, Any]:
         """
         基于MACD+KDJ生成交易信号
-        
-        Args:
-            data: 用于生成信号的数据
-            indicators: 已计算的指标，如果为None则重新计算
         
         Returns:
             包含交易信号的字典
         """
         try:
-            # 如果没有提供指标，则计算
-            if indicators is None:
-                indicators = self.calculate_indicators(data)
+            if self.data is None:
+                raise ValueError("策略数据未初始化，请先调用init_data方法")
                 
+            # 计算指标
+            indicators = self.calculate_indicators()
+            
             macd = indicators['macd']
             macd_signal = indicators['macd_signal']
             k = indicators['k']
@@ -167,8 +168,8 @@ class MACDKDJStrategy(Strategy):
             j = indicators['j']
             
             # 创建信号DataFrame
-            signals = pd.DataFrame(index=data.index)
-            signals['price'] = data['close']
+            signals = pd.DataFrame(index=self.data.index)
+            signals['price'] = self.data['close']
             signals['macd'] = macd
             signals['macd_signal'] = macd_signal
             signals['k'] = k
@@ -179,9 +180,13 @@ class MACDKDJStrategy(Strategy):
             signals['macd_buy_cross'] = (macd.shift(1) <= macd_signal.shift(1)) & (macd > macd_signal)
             signals['macd_sell_cross'] = (macd.shift(1) >= macd_signal.shift(1)) & (macd < macd_signal)
             
+            # 获取KDJ参数
+            kdj_oversold = self.params.get('kdj_oversold')
+            kdj_overbought = self.params.get('kdj_overbought')
+            
             # KDJ超买超卖信号
-            signals['kdj_oversold'] = (k < self.params.kdj_oversold) & (d < self.params.kdj_oversold) & (j < self.params.kdj_oversold)
-            signals['kdj_overbought'] = (k > self.params.kdj_overbought) & (d > self.params.kdj_overbought) & (j > self.params.kdj_overbought)
+            signals['kdj_oversold'] = (k < kdj_oversold) & (d < kdj_oversold) & (j < kdj_oversold)
+            signals['kdj_overbought'] = (k > kdj_overbought) & (d > kdj_overbought) & (j > kdj_overbought)
             
             # KDJ交叉信号
             signals['kdj_buy_cross'] = (k.shift(1) <= d.shift(1)) & (k > d)
@@ -197,87 +202,105 @@ class MACDKDJStrategy(Strategy):
             buy_signals = signals[signals['buy_signal']].index
             sell_signals = signals[signals['sell_signal']].index
             
-            if self.params.printlog:
+            if self.params.get('printlog'):
                 logger.info(f"生成信号: 买入信号{len(buy_signals)}个, 卖出信号{len(sell_signals)}个")
                 
-            return {
+            # 保存信号
+            self._signals = {
                 'signals': signals,
                 'buy_signals': buy_signals,
                 'sell_signals': sell_signals
             }
+            
+            return self._signals
         except Exception as e:
             logger.error(f"生成信号失败: {str(e)}")
-            raise StrategyError(f"生成信号失败: {str(e)}")
+            raise ValueError(f"生成信号失败: {str(e)}")
     
-    def execute_trade(self, data: pd.DataFrame, signals: Dict[str, Any] = None) -> Dict[str, Any]:
+    def execute_trade(self) -> Dict[str, Any]:
         """
         执行交易
-        
-        Args:
-            data: 交易数据
-            signals: 交易信号，如果为None则重新生成
         
         Returns:
             交易结果
         """
         try:
-            # 如果没有提供信号，则生成
-            if signals is None:
-                signals = self.generate_signals(data)
+            if self.data is None:
+                raise ValueError("策略数据未初始化，请先调用init_data方法")
+                
+            # 如果还没有生成信号，先生成
+            if self._signals is None:
+                self.generate_signals()
                 
             transactions = []
             total_profit = 0.0
-            position = False
+            position = 0  # 0表示空仓，大于0表示持仓
             buy_price = 0.0
             
+            # 获取交易参数
+            size = self.params.get('size')
+            printlog = self.params.get('printlog')
+            
             # 遍历所有交易日
-            for date in data.index:
+            for date in self.data.index:
                 # 执行买入信号
-                if date in signals['buy_signals'] and not position:
-                    price = data.loc[date, 'close']
+                if date in self._signals['buy_signals'] and position == 0:
+                    price = self.data.loc[date, 'close']
                     transactions.append({
                         'date': date,
                         'type': 'buy',
                         'price': price,
-                        'size': self.params.size,
+                        'size': size,
+                        'cost': price * size,
+                        'position': size,
                         'reason': 'MACD金叉且KDJ超卖或金叉'
                     })
-                    position = True
+                    position = size
                     buy_price = price
                     
-                    if self.params.printlog:
+                    if printlog:
                         logger.info(f"买入信号: {date}, 价格: {price:.2f}")
                 
                 # 执行卖出信号
-                elif date in signals['sell_signals'] and position:
-                    price = data.loc[date, 'close']
-                    profit = (price - buy_price) * self.params.size
+                elif date in self._signals['sell_signals'] and position > 0:
+                    price = self.data.loc[date, 'close']
+                    profit = (price - buy_price) * size
+                    profit_percent = (profit / (buy_price * size)) * 100 if buy_price > 0 else 0
                     total_profit += profit
                     
                     transactions.append({
                         'date': date,
                         'type': 'sell',
                         'price': price,
-                        'size': self.params.size,
+                        'size': size,
+                        'revenue': price * size,
                         'profit': profit,
+                        'profit_percent': profit_percent,
+                        'position': 0,
                         'reason': 'MACD死叉且KDJ超买或死叉'
                     })
-                    position = False
+                    position = 0
                     
-                    if self.params.printlog:
-                        logger.info(f"卖出信号: {date}, 价格: {price:.2f}, 利润: {profit:.2f}")
+                    if printlog:
+                        logger.info(f"卖出信号: {date}, 价格: {price:.2f}, 利润: {profit:.2f} ({profit_percent:.2f}%)")
             
             # 返回交易结果
-            return {
+            result = {
                 'transactions': transactions,
-                'total_buys': len(signals['buy_signals']),
-                'total_sells': len(signals['sell_signals']),
+                'total_buys': len(self._signals['buy_signals']),
+                'total_sells': len(self._signals['sell_signals']),
                 'total_profit': total_profit,
-                'final_position': 'holding' if position else 'cash'
+                'final_position': position,
+                'num_trades': len(transactions)
             }
+            
+            if printlog:
+                logger.info(f"交易结果: 总利润={total_profit:.2f}, 交易次数={len(transactions)}")
+                
+            return result
         except Exception as e:
             logger.error(f"执行交易失败: {str(e)}")
-            raise StrategyError(f"执行交易失败: {str(e)}")
+            raise ValueError(f"执行交易失败: {str(e)}")
 
 # 注册策略
-signals = register_strategy('macd_kdj', MACDKDJStrategy)
+register_strategy('macd_kdj', MACDKDJStrategy)

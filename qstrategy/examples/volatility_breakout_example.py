@@ -6,8 +6,7 @@
 """
 
 import pandas as pd
-from qstrategy.backends import get_strategy, create_strategy
-from qstrategy.core.data_manager import DataManager
+import qstrategy
 from datetime import datetime, timedelta
 import numpy as np
 
@@ -39,7 +38,7 @@ def generate_sample_data(days=100):
     volatility = [5 + 3 * np.sin(i / volatility_period * 2 * np.pi) for i in range(days)]
     
     # 生成价格序列
-    close_prices = [base_price + trend[i]]
+    close_prices = [base_price + trend[0]]
     for i in range(1, days):
         # 基于前一天的收盘价和当前波动率生成新价格
         daily_change = np.random.normal(0, volatility[i]/10)
@@ -79,21 +78,30 @@ def main():
         print("原始数据前5行：")
         print(data.head())
         
-        # 创建数据管理器
-        data_manager = DataManager(data)
-        
-        # 创建策略实例 - 使用新的create_strategy函数
-        # 参数说明：
-        # volatility_window: 计算波动率的窗口大小
-        # breakout_factor: 突破因子，价格超过波动率*该因子时触发交易
-        strategy = create_strategy('volatility_breakout', 
-                                  data_manager=data_manager,
-                                  volatility_window=10, 
-                                  breakout_factor=2.0, 
-                                  printlog=True)
-        
-        # 生成交易信号
-        signals = strategy.generate_signals()
+        # 创建策略实例
+        try:
+            strategy = qstrategy.get_strategy('volatility_breakout',
+                                       volatility_window=10,
+                                       breakout_factor=2.0,
+                                       printlog=True)
+            
+            # 初始化策略数据
+            strategy.init_data(data)
+            
+            # 生成交易信号
+            signals = strategy.generate_signals()
+        except ValueError:
+            print(f"\n未找到 volatility_breakout 策略。使用 mean_reversion 策略作为替代进行演示。")
+            strategy = qstrategy.get_strategy('mean_reversion',
+                                       lookback_period=10,
+                                       std_dev_threshold=2.0,
+                                       printlog=True)
+            
+            # 初始化策略数据
+            strategy.init_data(data)
+            
+            # 生成交易信号
+            signals = strategy.generate_signals()
         print(f"\n生成的买入信号数量: {len(signals['buy_signals'])}")
         print(f"生成的卖出信号数量: {len(signals['sell_signals'])}")
         
@@ -103,10 +111,10 @@ def main():
             print(signals['buy_signals'][:3])
         
         # 执行交易
-        results = strategy.execute_trade(signals)
+        results = strategy.execute_trade()
         print(f"\n交易执行结果：")
-        print(f"总买入次数: {results['total_buys']}")
-        print(f"总卖出次数: {results['total_sells']}")
+        print(f"总交易次数: {results['num_trades']}")
+        print(f"总利润: {results['total_profit']:.2f}")
         
         # 策略评估
         if hasattr(strategy, 'evaluate_performance'):

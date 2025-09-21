@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """
 布林带策略使用示例
 展示如何使用qstrategy中的布林带策略进行回测和信号生成
@@ -6,7 +8,7 @@
 """
 
 import pandas as pd
-from qstrategy.strategies.bbands_strategy import BBandsStrategy
+import qstrategy
 from datetime import datetime, timedelta
 
 # 设置日志
@@ -56,14 +58,14 @@ def main():
         print(data.head())
         
         # 创建策略实例
-        strategy = BBandsStrategy(
+        strategy = qstrategy.get_strategy('bbands',
             period=20, 
             devfactor=2.0, 
             printlog=True
         )
         
         # 初始化策略数据
-        strategy.init_strategy(data)
+        strategy.init_data(data)
         
         # 生成交易信号
         signals = strategy.generate_signals()
@@ -76,10 +78,16 @@ def main():
             print(signals['buy_signals'][:3])
         
         # 执行交易
-        results = strategy.execute_trade(signals)
+        results = strategy.execute_trade()
         print(f"\n交易执行结果：")
-        print(f"总买入次数: {results['total_buys']}")
-        print(f"总卖出次数: {results['total_sells']}")
+        print(f"总交易次数: {results['num_trades']}")
+        print(f"总利润: {results['total_profit']:.2f}")
+        
+        # 打印一些交易详情
+        if results['trades']:
+            print("\n部分交易详情：")
+            for i, tx in enumerate(results['trades'][:3]):
+                print(f"交易{i+1}: {tx['date']} - {tx['type']} @ {tx['price']:.2f}")
         
         # 策略评估
         if hasattr(strategy, 'evaluate_performance'):

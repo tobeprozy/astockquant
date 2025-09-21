@@ -36,14 +36,8 @@ from qstrategy.backends import (
     _auto_register_strategies
 )
 
-# 直接导入策略类，方便用户直接使用
-from qstrategy.strategies.bbands_strategy import BBandsStrategy
-from qstrategy.strategies.macd_strategy import MACDStrategy
-from qstrategy.strategies.rsi_strategy import RSIStrategy
-from qstrategy.strategies.macd_kdj_strategy import MACDKDJStrategy
-from qstrategy.strategies.mean_reversion_strategy import MeanReversionStrategy
-from qstrategy.strategies.volatility_breakout_strategy import VolatilityBreakoutStrategy
-from qstrategy.strategies.pair_trading_strategy import PairTradingStrategy
+# 策略通过backends模块的注册机制进行管理
+# 用户可以通过get_strategy()函数获取策略实例
 
 # 自动注册内置策略
 _auto_register_strategies()

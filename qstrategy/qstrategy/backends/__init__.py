@@ -167,6 +167,7 @@ def _auto_register_strategies():
         # 导入内置策略
         from qstrategy.backends import sma_cross, macd, rsi, bbands, pair_trading
         from qstrategy.backends import mean_reversion
+        from qstrategy.backends import macd_kdj
         
         # 这里不需要显式注册，每个策略模块内部应该有自注册逻辑
         logger.info("已自动导入所有内置策略")

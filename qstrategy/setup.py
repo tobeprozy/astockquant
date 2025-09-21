@@ -13,7 +13,6 @@ DESCRIPTION = 'AstockQuant策略插件系统'
 # 需安装的依赖
 INSTALL_REQUIRES = [
     'pandas>=1.0.0',
-    'numpy>=1.18.0',
     'backtrader'
 ]
 

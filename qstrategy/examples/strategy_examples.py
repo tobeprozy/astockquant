@@ -98,27 +98,33 @@ def generate_pair_stock_data(start_date='2020-01-01', end_date='2023-12-31', pri
     stock2_returns = 0.7 * stock1_returns + 0.3 * np.random.normal(0, 0.02, len(date_range)) + 0.0005
     stock2_price = price_level * np.exp(common_trend + stock2_returns)
     
-    # 创建股票1的DataFrame
+    # 创建股票1的DataFrame（先包含基本列）
+    stock1_open = stock1_price * (1 + np.random.normal(0, 0.01, len(date_range)))
     stock1_data = pd.DataFrame({
-        'open': stock1_price * (1 + np.random.normal(0, 0.01, len(date_range))),
-        'high': np.maximum(stock1_price, stock1_data['open']) * (1 + np.random.uniform(0, 0.02, len(date_range))),
-        'low': np.minimum(stock1_price, stock1_data['open']) * (1 - np.random.uniform(0, 0.02, len(date_range))),
+        'open': stock1_open,
         'close': stock1_price,
         'volume': np.random.randint(100000, 1000000, len(date_range))
     }, index=date_range)
+    
+    # 计算high和low列
+    stock1_data['high'] = np.maximum(stock1_data['close'], stock1_data['open']) * (1 + np.random.uniform(0, 0.02, len(date_range)))
+    stock1_data['low'] = np.minimum(stock1_data['close'], stock1_data['open']) * (1 - np.random.uniform(0, 0.02, len(date_range)))
     
     # 修正股票1的high和low计算
     stock1_data['high'] = np.maximum(stock1_data['high'], stock1_data['open'], stock1_data['close'])
     stock1_data['low'] = np.minimum(stock1_data['low'], stock1_data['open'], stock1_data['close'])
     
-    # 创建股票2的DataFrame
+    # 创建股票2的DataFrame（先包含基本列）
+    stock2_open = stock2_price * (1 + np.random.normal(0, 0.01, len(date_range)))
     stock2_data = pd.DataFrame({
-        'open': stock2_price * (1 + np.random.normal(0, 0.01, len(date_range))),
-        'high': np.maximum(stock2_price, stock2_data['open']) * (1 + np.random.uniform(0, 0.02, len(date_range))),
-        'low': np.minimum(stock2_price, stock2_data['open']) * (1 - np.random.uniform(0, 0.02, len(date_range))),
+        'open': stock2_open,
         'close': stock2_price,
         'volume': np.random.randint(100000, 1000000, len(date_range))
     }, index=date_range)
+    
+    # 计算high和low列
+    stock2_data['high'] = np.maximum(stock2_data['close'], stock2_data['open']) * (1 + np.random.uniform(0, 0.02, len(date_range)))
+    stock2_data['low'] = np.minimum(stock2_data['close'], stock2_data['open']) * (1 - np.random.uniform(0, 0.02, len(date_range)))
     
     # 修正股票2的high和low计算
     stock2_data['high'] = np.maximum(stock2_data['high'], stock2_data['open'], stock2_data['close'])
@@ -270,8 +276,8 @@ def run_pair_trading_example(data1, data2, plot_results=True, **kwargs):
         # 获取配对交易策略
         strategy = qstrategy.get_strategy('PairTrading', **kwargs)
         
-        # 初始化数据（配对交易需要两只股票的数据）
-        strategy.init_data(data1, data2)
+        # 初始化数据（配对交易需要两只股票的数据，以字典形式传入）
+        strategy.init_data({'stock1': data1, 'stock2': data2})
         
         # 计算指标
         indicators_data = strategy.calculate_indicators()
