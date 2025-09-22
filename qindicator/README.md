@@ -4,73 +4,122 @@ AstockQuant指标计算插件，提供统一的股票技术指标计算接口。
 
 ## 功能特性
 
-- 统一的技术指标计算接口
-- 支持多种指标计算库（默认支持TA-Lib）
-- 可扩展的插件架构
-- 支持常用技术指标：MA、EMA、RSI、MACD、布林带等
+- 统一的指标计算接口，支持多种指标库（目前主要支持TA-Lib）
+- 简洁直观的API设计，易于集成到现有项目
+- 支持常用的技术指标计算，包括移动平均线、RSI、MACD、布林带等
+- 灵活的扩展机制，可以方便地添加新的指标计算库
 
 ## 安装
 
+使用pip安装qindicator：
+
 ```bash
+pip install -e .
+```
+
+或者从GitHub克隆并安装：
+
+```bash
+git clone https://github.com/yourusername/qindicator.git
 cd qindicator
 pip install -e .
 ```
 
-## 使用示例
+## 依赖项
+
+- pandas>=1.0.0
+- numpy>=1.18.0
+- TA-Lib>=0.6.7
+
+## 基本使用
+
+### 导入指标计算器
+
+```python
+from qindicator import TalibIndicatorCalculator
+from qindicator import get_indicator_calculator
+```
+
+### 创建指标计算器实例
+
+```python
+# 方式1: 使用工厂函数
+calculator = get_indicator_calculator('talib')
+
+# 方式2: 直接使用类
+calculator = TalibIndicatorCalculator()
+```
+
+### 计算技术指标
 
 ```python
 import pandas as pd
-import qindicator
+import numpy as np
 
-# 初始化qindicator（自动使用ta-lib作为默认指标计算库）
-qindicator.init()
+# 准备数据
+dates = pd.date_range(start='2023-01-01', periods=100, freq='D')
+prices = 100 + np.cumsum(np.random.normal(0, 2, 100))
 
-# 准备数据（DataFrame需要包含'open', 'high', 'low', 'close', 'volume'列）
-# 这里假设您已经有了股票数据data
+data = {
+    'open': prices * (1 + np.random.normal(0, 0.01, 100)),
+    'high': prices * (1 + np.random.normal(0, 0.02, 100)),
+    'low': prices * (1 - np.random.normal(0, 0.02, 100)),
+    'close': prices,
+    'volume': np.random.randint(1000, 100000, 100)
+}
+df = pd.DataFrame(data, index=dates)
 
-data = pd.DataFrame({
-    'open': [100, 102, 101, 103, 104],
-    'high': [105, 104, 106, 107, 108],
-    'low': [98, 100, 100, 102, 103],
-    'close': [103, 101, 105, 106, 107],
-    'volume': [10000, 12000, 15000, 13000, 14000]
-})
+# 计算5日均线
+ma_data = calculator.calculate_ma(df, timeperiod=5)
 
-# 计算MA5
-ma_data = qindicator.calculate_ma(data, timeperiod=5)
-print(ma_data)
+# 计算RSI指标
+rsi_data = calculator.calculate_rsi(df, timeperiod=14)
 
-# 计算MACD
-macd_data = qindicator.calculate_macd(data)
-print(macd_data)
+# 计算MACD指标
+macd_data = calculator.calculate_macd(df, fastperiod=12, slowperiod=26, signalperiod=9)
 
-# 计算RSI
-rsi_data = qindicator.calculate_rsi(data)
-print(rsi_data)
+# 计算布林带指标
+bbands_data = calculator.calculate_bbands(df, timeperiod=20, nbdevup=2, nbdevdn=2)
 
-# 计算布林带
-bbands_data = qindicator.calculate_bbands(data)
-print(bbands_data)
+# 使用统一接口计算任意指标
+atr_data = calculator.calculate(df, 'atr')
 ```
-
-## 插件架构
-
-qindicator采用工厂模式和适配器模式，支持轻松扩展新的指标计算库：
-
-1. 创建新的指标计算器类，继承自`IndicatorCalculator`抽象基类
-2. 实现所有抽象方法
-3. 使用`IndicatorCalculatorFactory.register()`注册新的指标计算器
 
 ## 支持的指标
 
-- 移动平均线（MA）
-- 指数移动平均线（EMA）
-- 相对强弱指数（RSI）
-- 平滑异同移动平均线（MACD）
-- 布林带（Bollinger Bands）
+- MA (移动平均线)
+- EMA (指数移动平均线)
+- RSI (相对强弱指数)
+- MACD (移动平均收敛发散)
+- BBANDS (布林带)
+- ATR (平均真实波动幅度)
+- NATR (归一化波动幅度均值)
+- TRANGE (真实范围)
+- AVGPRICE (平均价格)
+- MEDPRICE (中位数价格)
 
-## 开发计划
+更多指标请参考TA-Lib文档。
 
-- 支持更多技术指标
-- 增加更多指标计算库的支持
-- 提供更丰富的参数配置
+## 示例
+
+examples目录下提供了使用示例：
+
+- `test_indicator.py`: 基本使用示例
+- `test_direct_import.py`: 直接导入类的使用示例
+- `verify_new_interface.py`: 验证新接口功能的测试脚本
+
+## 开发说明
+
+如果您想扩展qindicator以支持新的指标计算库，请参考以下步骤：
+
+1. 创建一个新的指标计算器类，继承自`Indicator`基类
+2. 实现必要的指标计算方法
+3. 在`__init__.py`中注册您的计算器
+
+## 许可证
+
+MIT License
+
+## 联系方式
+
+如有问题或建议，请联系AstockQuant Team。
