@@ -23,8 +23,7 @@ class StockScreener:
     def __init__(self):
         # 初始化 qdata
         qdata.init()
-        qdata.set_current_provider('akshare')
-        logger.info("qdata 初始化完成，数据源设置为 akshare")
+        logger.info("qdata 初始化完成")
         
         # 计算日期范围
         self.end_date = datetime.now().strftime('%Y-%m-%d')
@@ -46,7 +45,7 @@ class StockScreener:
         
         try:
             logger.info(f"获取股票 {code} 的数据")
-            df = qdata.get_daily_data(code, self.start_date, self.end_date)
+            df = qdata.get_daily_data(code, self.start_date, self.end_date, backend='akshare')
             
             # 处理数据格式
             if 'date' not in df.columns and df.index.name == 'date':

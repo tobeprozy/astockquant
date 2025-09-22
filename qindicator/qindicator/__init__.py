@@ -20,10 +20,10 @@ __version__ = "0.1.0"
 __author__ = "AstockQuant Team"
 
 # 导入实际存在的模块
-from qindicator.backends.talib.indicator import TalibIndicator as TalibIndicatorCalculator
+from qindicator.backends.talib.indicator import TalibIndicator
 
 # 快捷工厂函数，用于获取指标计算器实例
-def get_indicator_calculator(calculator_type: str = "talib") -> Optional[TalibIndicatorCalculator]:
+def get_indicator_calculator(calculator_type: str = "talib") -> Optional[TalibIndicator]:
     """
     获取指标计算器实例
     
@@ -34,7 +34,7 @@ def get_indicator_calculator(calculator_type: str = "talib") -> Optional[TalibIn
         指标计算器实例
     """
     if calculator_type.lower() == "talib":
-        return TalibIndicatorCalculator()
+        return TalibIndicator()
     else:
         logger.error(f"不支持的计算器类型: {calculator_type}")
         return None
@@ -42,6 +42,6 @@ def get_indicator_calculator(calculator_type: str = "talib") -> Optional[TalibIn
 
 # 定义模块导出列表
 __all__ = [
-    'TalibIndicatorCalculator',
+    'TalibIndicator',
     'get_indicator_calculator'
 ]

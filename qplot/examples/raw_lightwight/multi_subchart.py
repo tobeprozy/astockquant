@@ -21,8 +21,7 @@ logger = logging.getLogger(__name__)
 def main():
     # 初始化 qdata
     qdata.init()
-    qdata.set_current_provider('akshare')
-    logger.info("qdata 初始化完成，数据源设置为 akshare")
+    logger.info("qdata 初始化完成")
     
     # 计算日期范围（当前日期到往前3年）
     end_date = datetime.now().strftime('%Y-%m-%d')
@@ -30,8 +29,8 @@ def main():
     
     # 获取股票数据
     code = "000001"
-    logger.info(f"获取股票 {code} 的数据 (日期范围: {start_date} 到 {end_date})")
-    df = qdata.get_daily_data(code, start_date, end_date)
+    logger.info(f"获取股票 {code} 的数据 (日期范围: {start_date} 到 {end_date})" )
+    df = qdata.get_daily_data(code, start_date, end_date, backend='akshare')
     logger.info(f"数据获取完成，共 {len(df)} 条记录")
     
     # 处理数据格式

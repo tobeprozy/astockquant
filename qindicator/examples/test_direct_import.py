@@ -9,7 +9,7 @@ import os
 
 # 直接导入指标计算器类
 try:
-    from qindicator import TalibIndicatorCalculator
+    from qindicator import TalibIndicator
     from qindicator import get_indicator_calculator
     print("✅ 成功直接导入指标计算器类和工厂函数")
 except Exception as e:
@@ -114,14 +114,14 @@ def test_direct_import_indicator():
         }
         df = pd.DataFrame(data, index=dates)
         
-        # 测试直接使用TalibIndicatorCalculator类
+        # 测试直接使用TalibIndicator类
         try:
-            talib_calc = TalibIndicatorCalculator()
+            talib_calc = TalibIndicator()
             ma_data = talib_calc.calculate_ma(df, timeperiod=5)
             rsi_data = talib_calc.calculate_rsi(df, timeperiod=14)
-            print(f"✅ 成功使用TalibIndicatorCalculator类: 计算了MA5和RSI14指标")
+            print(f"✅ 成功使用TalibIndicator类: 计算了MA5和RSI14指标")
         except Exception as e:
-            print(f"❌ 使用TalibIndicatorCalculator类失败: {e}")
+            print(f"❌ 使用TalibIndicator类失败: {e}")
         
     except Exception as e:
         print(f"❌ 测试直接导入指标计算器类失败: {e}")

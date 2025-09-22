@@ -76,8 +76,15 @@ class BBANDSStrategy(Strategy):
         nbdevup = self.params.get('nbdevup', 2)
         nbdevdn = self.params.get('nbdevdn', 2)
         
+        # 获取指标计算器实例
+        try:
+            calculator = qindicator.get_indicator_calculator('talib')
+        except Exception as e:
+            logger.error(f"获取指标计算器实例失败: {e}")
+            raise ValueError(f"获取指标计算器实例失败: {e}")
+        
         # 计算布林带
-        bbands_result = qindicator.calculate_bbands(
+        bbands_result = calculator.calculate_bbands(
             self.data, 
             timeperiod=timeperiod,
             nbdevup=nbdevup,

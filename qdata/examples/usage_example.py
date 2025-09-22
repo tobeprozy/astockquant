@@ -30,7 +30,7 @@ print()
 print("示例3：使用TuShare数据源")
 try:
     # 假设已经设置了环境变量 TUSHARE_TOKEN
-    qdata.set_current_provider('tushare')
+    qdata.set_default_backend('tushare')
     
     # 获取ETF列表
     etf_list = qdata.get_etf_list()
@@ -45,7 +45,7 @@ print()
 
 # 示例4：获取分时数据
 print("示例4：获取分时数据")
-qdata.set_current_provider('akshare')  # 切换回akshare
+qdata.set_default_backend('akshare')  # 切换回akshare
 
 try:
     minute_data = qdata.get_minute_data('600000', '2023-06-30', freq='1min')
@@ -87,7 +87,7 @@ try:
         print(f"已创建示例CSV文件: {os.path.join(data_dir, '600000_daily.csv')}")
     
     # 使用CSV数据源
-    qdata.set_current_provider('csv')
+    qdata.set_default_backend('csv')
     
     # 从CSV文件获取数据
     csv_data = qdata.get_daily_data('600000', '2023-01-01', '2023-01-03')

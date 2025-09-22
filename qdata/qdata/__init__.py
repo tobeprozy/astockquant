@@ -85,7 +85,7 @@ def get_daily_data(
         DataFrame: 包含开盘价、最高价、最低价、收盘价、成交量等数据的DataFrame
     """
     if backend is None:
-        provider = _get_provider()
+        provider = get_provider()
     else:
         provider = create_provider(backend, **kwargs)
     
@@ -121,7 +121,7 @@ def get_minute_data(
         DataFrame: 包含开盘价、最高价、最低价、收盘价、成交量等数据的DataFrame
     """
     if backend is None:
-        provider = _get_provider()
+        provider = get_provider()
     else:
         provider = create_provider(backend, **kwargs)
     
@@ -149,7 +149,7 @@ def get_stock_list(
         DataFrame: 包含股票代码、名称等信息的DataFrame
     """
     if backend is None:
-        provider = _get_provider()
+        provider = get_provider()
     else:
         provider = create_provider(backend, **kwargs)
     
@@ -175,7 +175,7 @@ def get_etf_list(
         DataFrame: 包含ETF代码、名称等信息的DataFrame
     """
     if backend is None:
-        provider = _get_provider()
+        provider = get_provider()
     else:
         provider = create_provider(backend, **kwargs)
     

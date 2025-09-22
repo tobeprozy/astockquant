@@ -301,14 +301,19 @@ class SimpleLoopEngine:
         trades = 0
         
         # 检查策略类型并初始化
-        if hasattr(self.strategy, 'init_strategy'):
-            # 对于QStrategy类型的策略，先初始化
+        if hasattr(self.strategy, 'init_data') and hasattr(self.strategy, 'generate_signals'):
+            # 对于qstrategy新架构的策略，使用init_data和generate_signals方法
+            self.strategy.init_data(df)
+            # 预先生成所有信号
+            signals = self.strategy.generate_signals()
+        elif hasattr(self.strategy, 'init_strategy'):
+            # 对于旧版本QStrategy类型的策略，兼容处理
             self.strategy.init_strategy(df)
             # 预先生成所有信号
             signals = self.strategy.generate_signals()
         elif not hasattr(self.strategy, 'on_bar'):
-            # 如果策略既没有on_bar方法也没有init_strategy方法，抛出异常
-            raise AttributeError(f'策略对象{self.strategy.__class__.__name__}没有on_bar或init_strategy方法')
+            # 如果策略既没有on_bar方法也没有初始化方法，抛出异常
+            raise AttributeError(f'策略对象{self.strategy.__class__.__name__}没有on_bar或init_data/init_strategy方法')
         
         # 逐bar回测
         for ts, row in df.iterrows():

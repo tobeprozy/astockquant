@@ -1,12 +1,28 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Alpaca交易API示例
+注意：运行此示例需要安装alpaca_trade_api模块
+安装命令: pip install alpaca_trade_api
+"""
+
+# 示例API密钥（仅用于演示）
 API_KEY = "PKGR0767ZPNPOBCBBNP8"
 SECRET_KEY = "akmuGzz5LVYIK5EzfA11xwfnBiZLkEfFXUvVsnXI"
 
 import datetime
 import time
+import sys
 
-import alpaca_trade_api as tradeapi
-import numpy as np
-import pandas as pd
+# 尝试导入必要的依赖
+try:
+    import alpaca_trade_api as tradeapi
+    import numpy as np
+    import pandas as pd
+except ImportError:
+    print("错误: 缺少必要的依赖包。")
+    print("请运行: pip install alpaca_trade_api numpy pandas")
+    sys.exit(1)
 
 pd.options.display.max_rows = 999
 pd.set_option('display.max_columns', None)

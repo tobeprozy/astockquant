@@ -39,7 +39,7 @@ def get_data_and_save_to_csv(code="000001", start_date="20180701", end_date="202
         start_date_formatted = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:]}"
         end_date_formatted = f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:]}"
         
-        df = qdata.get_daily_data(code, start_date_formatted, end_date_formatted)
+        df = qdata.get_daily_data(code, start_date_formatted, end_date_formatted, backend='akshare')
         print(f"成功获取数据，数据量: {len(df)}行")
         
         # 处理数据格式

@@ -64,11 +64,12 @@ class MACDStrategy(Strategy):
         if self.data is None:
             raise ValueError("策略数据未初始化，请先调用init_data方法")
         
-        # 确保qindicator已初始化
+        # 获取指标计算器实例
         try:
-            qindicator.init()
+            calculator = qindicator.get_indicator_calculator('talib')
         except Exception as e:
-            logger.warning(f"初始化qindicator失败，使用已有实例: {e}")
+            logger.error(f"获取指标计算器实例失败: {e}")
+            raise ValueError(f"获取指标计算器实例失败: {e}")
         
         # 获取参数
         fast_period = self.params.get('fast_period', 12)
@@ -76,7 +77,7 @@ class MACDStrategy(Strategy):
         signal_period = self.params.get('signal_period', 9)
         
         # 计算MACD
-        macd_result = qindicator.calculate_macd(
+        macd_result = calculator.calculate_macd(
             self.data, 
             fastperiod=fast_period,
             slowperiod=slow_period,

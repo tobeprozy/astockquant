@@ -6,12 +6,13 @@ root = os.path.abspath(os.path.join(cur_dir, '..'))
 if root not in sys.path:
     sys.path.append(root)
 
-from adapters.akshare_provider import AkshareFundProvider
+from qdata.backends.akshare_provider import AkShareProvider
 
 
 def main() -> None:
-    provider = AkshareFundProvider()
-    df = provider.fetch(symbol='512200', start_date='20220101', end_date='20240101')
+    provider = AkShareProvider()
+    # 使用正确的日期格式和方法名
+    df = provider.get_daily_data(symbol='512200', start_date='2022-01-01', end_date='2024-01-01')
     print(df.head())
     assert not df.empty
 

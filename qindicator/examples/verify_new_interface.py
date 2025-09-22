@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 # 测试导入新接口
 try:
-    from qindicator import TalibIndicatorCalculator
+    from qindicator import TalibIndicator
     from qindicator import get_indicator_calculator
     print("✅ 成功导入新接口")
 except Exception as e:
@@ -27,7 +27,7 @@ try:
     print("✅ 成功使用工厂函数创建指标计算器实例")
     
     # 直接使用类
-    calc2 = TalibIndicatorCalculator()
+    calc2 = TalibIndicator()
     print("✅ 成功直接使用类创建指标计算器实例")
 except Exception as e:
     print(f"❌ 创建指标计算器实例失败: {e}")
