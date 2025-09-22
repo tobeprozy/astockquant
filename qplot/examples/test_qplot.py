@@ -109,19 +109,21 @@ def test_data_manager():
     """测试DataManager的功能"""
     print("测试DataManager的功能...")
     
-    # 创建数据管理器
-    dm = DataManager()
+    # 创建数据管理器（K线图）
+    dm_kline = DataManager('600519', data_type='daily')
     
     # 生成并添加数据
     kline_data = generate_test_kline_data()
-    minute_data = generate_test_minute_data()
+    dm_kline.update_data(kline_data)
     
-    dm.set_kline_data(kline_data)
-    dm.set_minute_data(minute_data)
+    # 创建数据管理器（分时图）
+    dm_minute = DataManager('600519', data_type='minute')
+    minute_data = generate_test_minute_data()
+    dm_minute.update_data(minute_data)
     
     # 使用统一的plot_chart接口绘制图表
     kline_chart = qplot.plot_chart(
-        data_manager=dm,
+        data_manager=dm_kline,
         chart_type='kline',
         title="使用DataManager的K线图",
         volume=True,
@@ -129,7 +131,7 @@ def test_data_manager():
     )
     
     minute_chart = qplot.plot_chart(
-        data_manager=dm,
+        data_manager=dm_minute,
         chart_type='minute',
         title="使用DataManager的分时图",
         volume=True
@@ -146,18 +148,13 @@ def test_backend_switching():
     kline_data = generate_test_kline_data()
     
     try:
-        # 切换到pyecharts后端
-        qplot.set_default_backend('pyecharts')
-        
-        # 绘制K线图
+        # 使用pyecharts后端绘制K线图
         chart = qplot.plot_kline(
             data=kline_data,
             title="使用pyecharts后端的K线图",
-            volume=True
+            volume=True,
+            backend='pyecharts'
         )
-        
-        # 切回matplotlib后端
-        qplot.set_default_backend('matplotlib')
         
         return chart
     except ImportError:
