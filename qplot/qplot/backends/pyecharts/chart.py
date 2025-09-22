@@ -595,7 +595,7 @@ class PyechartsChart(Chart):
             "价格",
             data['close'].tolist(),
             is_smooth=True,
-            line_opts=opts.LineStyleOpts(width=2),
+            linestyle_opts=opts.LineStyleOpts(width=2),
             itemstyle_opts=opts.ItemStyleOpts(color=price_color),
         )
         
@@ -605,7 +605,7 @@ class PyechartsChart(Chart):
                 "均价",
                 data['avg_price'].tolist(),
                 is_smooth=True,
-                line_opts=opts.LineStyleOpts(width=2),
+                linestyle_opts=opts.LineStyleOpts(width=2),
                 itemstyle_opts=opts.ItemStyleOpts(color=avg_color),
             )
         
