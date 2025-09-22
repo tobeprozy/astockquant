@@ -42,3 +42,9 @@ coverage/
 
 # 特定语言文件
 *.csv
+
+# 生成的分析结果和图表文件
+qapp/stock_analyzer_plot/output/
+*.html
+*.xlsx
+~$*.xlsx

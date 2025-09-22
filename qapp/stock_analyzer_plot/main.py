@@ -1,5 +1,4 @@
-python
-import tushare as ts
+import qdata
 import pandas as pd
 import pyecharts
 from pyecharts import options as opts
@@ -10,12 +9,9 @@ from openpyxl import Workbook
 
  
  
-# 设置Token
-ts.set_token('******************') #请填入自己的Token
- 
-# 初始化接口
-ts_api = ts.pro_api()
-print("Tushare 接口调用正常，版本号:" + ts.__version__ +"\n")
+# 初始化qdata接口
+qdata.init()
+print("qdata 接口调用正常，使用akshare数据源\n")
 print("pyecharts数据交互 接口调用正常，版本号:{}".format(pyecharts.__version__)+"\n")
  
  
@@ -60,35 +56,134 @@ class Stock:
  
     # 设置股票代码
     def set_code(self,code):
- 
-        stock_list = ts_api.stock_basic(exchange='', list_status='L',
-                                        fields='ts_code,symbol,name,area,industry,market,list_date')
-        a = stock_list["ts_code"].tolist()
- 
-        for i in range(len(a)):
-            if a[i][0:6] == code:
-                self.code=a[i]
-                self.name=stock_list.loc[i,"name"]
-            # 请求股票列表
+        # 直接使用输入的代码作为股票代码
+        self.code = code
+        # 尝试获取股票名称
+        try:
+            # 获取股票基本信息
+            stock_info = qdata.get_stock_basic_info(code)
+            if stock_info and 'name' in stock_info:
+                self.name = stock_info['name']
+            else:
+                self.name = code
+        except:
+            self.name = code
  
     # 获取日线交易数据
-    def get_daily_trade(self):  # 股票代码，开始日期20120101，结束日期20180101
- 
+    def get_daily_trade(self):
+        print(f"正在获取{self.code} {self.name}的交易数据...")
+        
         # print("正在获取交易数据：\n    --Start Download")
         if self.start == "":
             self.start = input("请输入交易开始日期：")
             self.end = input("请输入交易结束日期：")
- 
-        # 请求日线数据
-        # print(self.start)
-        df = ts_api.daily(ts_code = self.code, start_date = self.start, end_date = self.end)
- 
-        # 按交易日升序排序
-        df.sort_values(by=["trade_date"], inplace=True)
+
+        # 请求日线数据，使用qdata的akshare数据源
+        df = qdata.get_daily_data(self.code, start_date=self.start, end_date=self.end, backend='akshare')
+        
+        print(f"qdata返回的数据列：{list(df.columns)}")
+
+        # 确保数据不为空
+        if df.empty:
+            print(f"警告：获取{self.code}的数据为空")
+            # 创建一个最小的DataFrame以避免后续错误
+            df = pd.DataFrame({
+                'trade_date': [self.start, self.end],
+                'open': [1.0, 1.0],
+                'close': [1.0, 1.0],
+                'high': [1.0, 1.0],
+                'low': [1.0, 1.0],
+                'vol': [0, 0]
+            })
+            self.df = df
+            return
+
+        # 确保date列存在并格式正确
+        # 先检查索引是否是日期列
+        if df.index.name == 'date' or (df.index.dtype == 'datetime64[ns]' and len(df) > 0):
+            # 创建一个临时DataFrame来存储索引列
+            temp_df = df.copy()
+            # 将索引转换为列
+            temp_df.reset_index(inplace=True)
+            # 如果索引名是'date'，直接使用该列
+            if df.index.name == 'date':
+                df = temp_df
+                print("使用索引列作为date")
+            else:
+                # 索引名不是'date'但类型是datetime，重命名为'date'
+                temp_df.rename(columns={df.index.name: 'date'}, inplace=True)
+                df = temp_df
+                print("使用索引列作为date")
+        elif 'date' in df.columns:
+            print("已存在date列")
+        else:
+            # 检查更多可能的日期列名
+            common_date_columns = ['datetime', 'time', 'timestamp', 'trading_date', 'transaction_date', 'trade_date']
+            found_date_col = None
+            
+            # 先检查常见的日期列名
+            for col in common_date_columns:
+                if col in df.columns:
+                    found_date_col = col
+                    break
+            
+            # 如果没有找到常见日期列名，尝试查找包含'date'字符串的列
+            if not found_date_col:
+                date_like_columns = [col for col in df.columns if 'date' in col.lower()]
+                if date_like_columns:
+                    found_date_col = date_like_columns[0]
+            
+            # 如果找到日期列
+            if found_date_col:
+                df['date'] = df[found_date_col]
+                print(f"使用{found_date_col}作为date")
+            else:
+                # 创建一个默认的date列，使用交易日频率而不是日历日
+                print("Warning: 没有找到日期列，创建默认交易日列")
+                # 尝试使用B频率（工作日）来更接近实际交易日
+                date_range = pd.date_range(start=self.start, periods=min(len(df)*2, 365), freq='B')
+                # 截取需要的长度
+                if len(date_range) >= len(df):
+                    date_range = date_range[:len(df)]
+                else:
+                    # 如果工作日数量不够，补充剩余天数
+                    remaining = len(df) - len(date_range)
+                    additional_dates = pd.date_range(start=date_range[-1] + pd.Timedelta(days=1), periods=remaining)
+                    date_range = date_range.append(additional_dates)
+                
+                df['date'] = date_range.strftime('%Y%m%d')
+        
+        # 确保日期格式是字符串YYYYMMDD，兼容图表格式化需求
+        if not pd.api.types.is_string_dtype(df['date']):
+            try:
+                # 尝试转换datetime类型为字符串格式
+                df['date'] = df['date'].dt.strftime('%Y%m%d')
+            except:
+                # 其他类型尝试转换为字符串
+                df['date'] = df['date'].astype(str)
+
+        # 确保vol列存在
+        if 'volume' in df.columns:
+            df['vol'] = df['volume']
+        elif 'vol' not in df.columns:
+            df['vol'] = 0
+            print("Warning: 没有找到成交量列，创建默认vol列")
+
+        # 确保OHLC列存在
+        for col in ['open', 'close', 'high', 'low']:
+            if col not in df.columns:
+                df[col] = 0
+                print(f"Warning: 没有找到{col}列，创建默认列")
+
+        # 按日期升序排序
+        df.sort_values(by=['date'], inplace=True)
         df.reset_index(drop=True, inplace=True)
+
         self.df = df
- 
-        # print("已获取{} {}，交易数据，共计{}条交易数据\n".format(self.code,self.name, len(self.df)))
+
+        # 打印部分数据以调试
+        print(f"处理后的数据列：{list(df.columns)}")
+        print(f"数据前2行：\n{df[['date', 'open', 'close', 'high', 'low', 'vol']].head(2)}")
  
     # 指数移动均线工具
     def get_MA_EMA(self, n):
@@ -320,7 +415,7 @@ class Stock:
         line = (
             Line(init_opts=opts.InitOpts(theme=itheme,animation_opts=opts.AnimationOpts(animation=False),))
                 # 添加x轴交易日期数据
-                .add_xaxis(df["trade_date"].tolist())
+                .add_xaxis(df["date"].tolist())
                 .add_yaxis("MA{}".format(n),df["MA{}".format(n)].tolist(),xaxis_index=index,yaxis_index=index,
                            label_opts=opts.LabelOpts(is_show=False),
                            is_symbol_show=False, # 是否显示小圆点
@@ -342,7 +437,7 @@ class Stock:
         line = (
             Line(init_opts=opts.InitOpts(theme=itheme,animation_opts=opts.AnimationOpts(animation=False),))
                 # 添加x轴交易日期数据
-                .add_xaxis(df["trade_date"].tolist())
+                .add_xaxis(df["date"].tolist())
                 .add_yaxis("VolMA{}".format(n),df["VolMA{}".format(n)].tolist(),xaxis_index=index,yaxis_index=index,
                            label_opts=opts.LabelOpts(is_show=False),
                            is_symbol_show=False, # 是否显示小圆点
@@ -368,19 +463,19 @@ class Stock:
         # 构建日交易金额数据list
         for i in range(len(self.list_BuyorSell)):
             profit = self.list_BuyorSell[i][4] # 0.05
-            temp_data.append(opts.MarkAreaItem(name="", x=(df.loc[self.list_BuyorSell[i][0],"trade_date"], df.loc[self.list_BuyorSell[i][1],"trade_date"])))
-            temp_data2.append([ { "xAxis": df.loc[self.list_BuyorSell[i][0],"trade_date"],
+            temp_data.append(opts.MarkAreaItem(name="", x=(df.loc[self.list_BuyorSell[i][0],"date"], df.loc[self.list_BuyorSell[i][1],"date"])))
+            temp_data2.append([ { "xAxis": df.loc[self.list_BuyorSell[i][0],"date"],
                                   "yAxis": df.loc[self.list_BuyorSell[i][0],"open"],
-                                  "value": "盈利：{:.2f}%".format(profit*100)
+                                  "value": "盈利：{:.2f}%" .format(profit*100)
                                   },
                                 {
-                                "xAxis": df.loc[self.list_BuyorSell[i][1], "trade_date"],
+                                "xAxis": df.loc[self.list_BuyorSell[i][1], "date"],
                                 "yAxis": self.list_BuyorSell[i][3],
                                 }])
             totalProfit = totalProfit*(1+profit)
  
             # 输出Excel交易操作信息
-            tradeAction.append([ df.loc[self.list_BuyorSell[i][0],"trade_date"], df.loc[self.list_BuyorSell[i][1], "trade_date"], round(df.loc[self.list_BuyorSell[i][0],"open"],2),round(self.list_BuyorSell[i][3],2), "{:.2f}%".format(self.list_BuyorSell[i][4]*100)])
+            tradeAction.append([ df.loc[self.list_BuyorSell[i][0],"date"], df.loc[self.list_BuyorSell[i][1], "date"], round(df.loc[self.list_BuyorSell[i][0],"open"],2),round(self.list_BuyorSell[i][3],2), "{:.2f}%" .format(self.list_BuyorSell[i][4]*100)])
  
         self.totalProfit = totalProfit
             # name="交易{:0>2d}\n{:.2f}%".format(i+1,profit)
@@ -388,7 +483,7 @@ class Stock:
  
         for i in range(len(df)):
             valueList.append([df.loc[i, "open"], df.loc[i, "close"], df.loc[i, "high"], df.loc[i, "low"],(df.loc[i,"close"]-df.loc[i,"open"])/df.loc[i,"open"]  ])
-        x = df["trade_date"].tolist()
+        x = df["date"].tolist()
         y = valueList
         # 绘制K线图
         kline = (
@@ -517,7 +612,7 @@ class Stock:
         # 绘制成交量柱状图
         bar = (
             Bar()
-                .add_xaxis(xaxis_data=df["trade_date"].tolist())
+                .add_xaxis(xaxis_data=df["date"].tolist())
                 .add_yaxis(series_name="Volume",y_axis=df["vol"].tolist(),label_opts=opts.LabelOpts(is_show=False),
                     # 设置多图联动
                     xaxis_index=1,
@@ -564,12 +659,12 @@ class Stock:
     # 绘制主图并输出页面
     def Print_Main_index(self,kline,bar_volumn,line_ma=None,line_ma2=None,line_ma3=None,line_ma4 = None,itheme="light"):
         bar = bar_volumn
- 
+
         kline.overlap(line_ma)
         kline.overlap(line_ma2)
         kline.overlap(line_ma3)
         kline.overlap(line_ma4)
- 
+
         grid_chart = Grid(
             init_opts=opts.InitOpts(
                 width="1200px", height="580px",
@@ -587,10 +682,20 @@ class Stock:
             bar,
             grid_opts=opts.GridOpts(pos_left="10%", pos_right="10%", pos_top="75%", height="16%"),
         )
-        grid_chart.render(path = "C:/Users/***/Desktop/StockAnalysis/pyecharts-{}-{}.html".format(self.code[0:6],self.name))
+        
         import os
-        print("已保存文件至{}".format("C:/Users/***/Desktop/StockAnalysis/pyecharts-{}-{}.html".format(self.code[0:6],self.name)))
-        # os.system("start C:/Users/***/Desktop/pyecharts-{}-{}.html".format(self.code[0:6],self.name))
+        # 获取当前脚本文件所在目录
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        # 确保output目录存在于脚本目录下
+        output_dir = os.path.join(script_dir, "output")
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        
+        # 保存HTML文件到脚本目录下的output目录
+        html_filename = "pyecharts-{}-{}.html".format(self.code[0:6], self.name)
+        html_path = os.path.join(output_dir, html_filename)
+        grid_chart.render(path=html_path)
+        print("已保存图表至output目录：{}".format(html_path))
  
     def begin(self):
         self.get_daily_trade()
@@ -679,36 +784,68 @@ class ExcelWriter:
  
  
     def saveExcel(self):
+        import os
+        # 获取当前脚本文件所在目录
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        # 确保output目录存在于脚本目录下
+        output_dir = os.path.join(script_dir, "output")
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        
+        # 更新保存路径到脚本目录下的output目录
+        if not self.path.startswith(output_dir):
+            self.path = os.path.join(output_dir, os.path.basename(self.path))
+            
         print("保存文件至 -> {}".format(self.path))
         self.wb.save(self.path)
-        import os
-        os.system("start  C:/Users/***/Desktop/StockAnalysis/totalAnalysis.xlsx")
+        
+        # 检测操作系统并使用适当的命令打开文件
+        if os.name == 'nt':  # Windows
+            os.system(f'start {self.path}')
+        elif os.name == 'posix':  # macOS or Linux
+            os.system(f'open {self.path}')  # macOS
+            # os.system(f'xdg-open {self.path}')  # Linux (uncomment if needed)
  
  
  
- 
- 
+
 if __name__ == '__main__':
     returnList = []
     codeList = []
-    with open("C:/Users/***/Desktop/StockAnalysis/code.txt", 'r') as file:
-        data = file.readlines()
-        for i in data:
-            codeList.append(i.replace("\n",""))
-    print(codeList)
- 
-    # for i in range(10):
-    #     code = input("请输入证券代码：")
-    #     codeList.append(code)
- 
+    
+    try:
+        # 尝试打开代码文件
+        with open("code.txt", 'r') as file:
+            data = file.readlines()
+            for i in data:
+                codeList.append(i.replace("\n",""))
+    except FileNotFoundError:
+        # 如果文件不存在，使用默认股票代码
+        print("代码文件不存在，使用默认股票代码")
+        codeList = ["000001", "000002", "600000"]  # 示例股票代码
+    
+    print("将要分析的股票代码：", codeList)
+
     for i in codeList:
-        stock1 = Stock()
-        stock1.set_code(i)
-        stock1.start = "20210101"
-        stock1.end = "20211201"
-        stock1.begin()
-    ew = ExcelWriter()
-    ew.setLocation("C:/Users/***/Desktop/StockAnalysis/totalAnalysis.xlsx")
-    ew.newFile()
-    ew.writeData(returnList)
-    ew.saveExcel()
+        try:
+            stock1 = Stock()
+            stock1.set_code(i)
+            stock1.start = "20250101"
+            stock1.end = "20251201"
+            stock1.begin()
+        except Exception as e:
+            print(f"分析股票 {i} 时出错: {e}")
+    
+    # 仅在有分析结果时保存Excel
+    if returnList:
+        try:
+            ew = ExcelWriter()
+            ew.setLocation("totalAnalysis.xlsx")
+            ew.newFile()
+            ew.writeData(returnList)
+            ew.saveExcel()
+        except Exception as e:
+            print(f"保存Excel时出错: {e}")
+            print("分析结果:", returnList)
+    else:
+        print("没有分析结果")
