@@ -2,7 +2,7 @@ Metadata-Version: 2.4
 Name: qbackengine
 Version: 0.1.0
 Summary: qbackengine - 一个简洁的量化交易回测引擎插件系统
-Home-page: https://github.com/yourusername/qbacktest
+Home-page: https://github.com/astockquant/qbackengine
 Author: AstockQuant Team
 Author-email: team@astockquant.com
 License: MIT

@@ -23,7 +23,6 @@ __author__ = "AstockQuant Team"
 # 导入数据源和策略插件
 from qdata import get_provider
 import qstrategy
-from qstrategy.factory import StrategyFactory
 
 # 导入回测引擎实现
 from .engine import BacktraderEngine, MultiSymbolBacktraderEngine, SimpleLoopEngine, SimpleResult
@@ -88,8 +87,10 @@ def create_backtrader_engine(
     mapped_strategy_name = STRATEGY_NAME_MAPPING.get(strategy_name, strategy_name)
     
     try:
-        # 获取策略类
-        strategy_cls = StrategyFactory.get_strategy_class(mapped_strategy_name)
+        # 获取策略实例
+        strategy = qstrategy.get_strategy(mapped_strategy_name, **(strategy_kwargs or {}))
+        # 对于backtrader引擎，我们需要策略类而不是实例
+        strategy_cls = strategy.__class__
     except Exception as e:
         # 策略未找到时的默认处理
         logger.warning(f"未找到策略 '{mapped_strategy_name}'，使用默认的SmaCrossStrategy")
@@ -144,16 +145,16 @@ def create_multi_symbol_engine(
     mapped_strategy_name = STRATEGY_NAME_MAPPING.get(strategy_name, strategy_name)
     
     try:
-        # 获取策略类
-        strategy_cls = StrategyFactory.get_strategy_class(mapped_strategy_name)
+        # 获取策略实例
+        strategy = qstrategy.get_strategy(mapped_strategy_name)
         # 对于多标的策略，我们需要获取backtrader策略类
-        bt_strategy_cls = strategy_cls().get_backtrader_strategy()
+        bt_strategy_cls = strategy.get_backtrader_strategy()
     except Exception as e:
         # PairTrading策略未找到时的默认处理
         logger.warning(f"未找到策略 '{mapped_strategy_name}'，使用默认的SmaCrossStrategy")
         from qstrategy.strategies.sma_cross import SmaCrossStrategy
-        strategy_cls = SmaCrossStrategy
-        bt_strategy_cls = strategy_cls().get_backtrader_strategy()
+        strategy = SmaCrossStrategy()
+        bt_strategy_cls = strategy.get_backtrader_strategy()
     
     # 创建回测引擎
     engine = MultiSymbolBacktraderEngine(

@@ -46,7 +46,7 @@ def init():
         _data_provider = None
 
 
-def _get_provider() -> DataProvider:
+def get_provider() -> DataProvider:
     """
     获取数据提供者实例（单例模式）
     

@@ -9,11 +9,11 @@ qstrategy.egg-info/top_level.txt
 qstrategy/backends/__init__.py
 qstrategy/backends/bbands.py
 qstrategy/backends/macd.py
+qstrategy/backends/macd_kdj.py
 qstrategy/backends/mean_reversion.py
 qstrategy/backends/pair_trading.py
 qstrategy/backends/rsi.py
 qstrategy/backends/sma_cross.py
 qstrategy/backends/turtle.py
-qstrategy/strategies/bbands_strategy.py
-qstrategy/strategies/macd_strategy.py
-qstrategy/strategies/rsi_strategy.py
+qstrategy/backends/volatility_breakout.py
+qstrategy/core/strategy.py

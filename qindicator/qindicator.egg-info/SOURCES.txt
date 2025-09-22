@@ -1,12 +1,11 @@
 README.md
 setup.py
 qindicator/__init__.py
-qindicator/calculator.py
-qindicator/factory.py
 qindicator.egg-info/PKG-INFO
 qindicator.egg-info/SOURCES.txt
 qindicator.egg-info/dependency_links.txt
 qindicator.egg-info/requires.txt
 qindicator.egg-info/top_level.txt
-qindicator/indicators/__init__.py
-qindicator/indicators/talib_indicator.py
+qindicator/backends/__init__.py
+qindicator/backends/talib/indicator.py
+qindicator/core/indicator.py

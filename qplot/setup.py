@@ -1,5 +1,6 @@
 import os
 from setuptools import setup, find_packages
+import sys
 
 # 读取项目目录下的README文件作为长描述
 readme_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'README.md')
@@ -9,11 +10,8 @@ if os.path.exists(readme_path):
 else:
     long_description = '统一的股票数据可视化插件，支持实时日K线图和分时图绘制'
 
-# 确保当前目录中有一个qplot目录
-if not os.path.exists('qplot'):
-    os.makedirs('qplot')
-    with open('qplot/__init__.py', 'a'):
-        pass
+# 确保所有子包都被包含
+packages = find_packages(include=['qplot', 'qplot.*'])
 
 setup(
     name='qplot',
@@ -24,16 +22,17 @@ setup(
     author='AstockQuant Team',
     author_email='team@astockquant.com',
     url='https://github.com/astockquant/qplot',
-    packages=['qplot', 'qplot.plotters'],
+    packages=packages,
     package_dir={
-        'qplot': 'qplot',
-        'qplot.plotters': 'qplot/plotters'
+        'qplot': 'qplot'
     },
     include_package_data=True,
     package_data={
         'qplot': [
-            'plotters/**/*',
             '*.py',
+            'backends/*.py',
+            'backends/*/*.py',
+            'core/*.py',
         ],
     },
     install_requires=[

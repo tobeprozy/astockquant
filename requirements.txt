@@ -1,0 +1,4 @@
+# qdata模块依赖包
+pandas>=1.0.0
+akshare>=1.9.0
+tushare>=1.2.80

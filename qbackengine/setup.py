@@ -1,5 +1,5 @@
 """
-qbacktest - 量化交易回测插件
+qbackengine - 量化交易回测插件
 
 该插件提供简洁而强大的回测功能，支持不同的回测引擎和策略。
 """
@@ -7,6 +7,7 @@ qbacktest - 量化交易回测插件
 from setuptools import setup, find_packages
 from codecs import open
 from os import path
+import sys
 
 here = path.abspath(path.dirname(__file__))
 
@@ -14,13 +15,16 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
+# 确保所有子包都被包含
+packages = find_packages(include=['qbackengine', 'qbackengine.*'])
+
 setup(
     name='qbackengine',
     version='0.1.0',
     description='qbackengine - 一个简洁的量化交易回测引擎插件系统',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    url='https://github.com/yourusername/qbacktest',
+    url='https://github.com/astockquant/qbackengine',
     author='AstockQuant Team',
     author_email='team@astockquant.com',
     license='MIT',
@@ -36,7 +40,14 @@ setup(
         'Programming Language :: Python :: 3.10',
     ],
     keywords='quantitative trading backtest',
-    packages=find_packages(exclude=['contrib', 'docs', 'tests']),
+    packages=packages,
+    package_dir={
+        'qbackengine': 'qbackengine'
+    },
+    include_package_data=True,
+    package_data={
+        'qbackengine': ['*.py', 'README.md'],
+    },
     install_requires=[
         'pandas>=1.0.0',
         'numpy>=1.18.0',
@@ -45,9 +56,6 @@ setup(
         'backtrader'  # 如果使用backtrader引擎
     ],
     python_requires='>=3.7',
-    package_data={
-        'qbackengine': ['README.md'],
-    },
     entry_points={
         'console_scripts': [
             # 可以添加命令行工具入口点

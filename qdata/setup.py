@@ -1,19 +1,17 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 import os
+import sys
 
-# 读取项目目录下的README文件作为长描述
-readme_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'README.md')
+# 读取项目目录下的README.md文件作为长描述
+readme_path = os.path.join(os.path.dirname(__file__), 'README.md')
 if os.path.exists(readme_path):
     with open(readme_path, 'r', encoding='utf-8') as f:
         long_description = f.read()
 else:
     long_description = '统一的股票数据获取插件，支持多种数据源'
 
-# 确保当前目录中有一个qdata目录
-if not os.path.exists('qdata'):
-    os.makedirs('qdata')
-    with open('qdata/__init__.py', 'a'):
-        pass
+# 确保所有子包都被包含
+packages = find_packages(include=['qdata', 'qdata.*'])
 
 setup(
     name='qdata',
@@ -24,16 +22,17 @@ setup(
     author='AstockQuant Team',
     author_email='team@astockquant.com',
     url='https://github.com/astockquant/qdata',
-    packages=['qdata', 'qdata.providers'],
+    packages=packages,
     package_dir={
-        'qdata': 'qdata',
-        'qdata.providers': 'qdata/providers'
+        'qdata': 'qdata'
     },
     include_package_data=True,
     package_data={
         'qdata': [
-            'providers/**/*',
             '*.py',
+            'backends/*.py',
+            'backends/*/*.py',
+            'core/*.py',
         ],
     },
     install_requires=[
