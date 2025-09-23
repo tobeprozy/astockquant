@@ -61,30 +61,41 @@ class SMACrossStrategy(Strategy):
         if self.data is None:
             raise ValueError("策略数据未初始化，请先调用init_data方法")
         
-        # 确保qindicator已初始化
-        try:
-            qindicator.init()
-        except Exception as e:
-            logger.warning(f"初始化qindicator失败，使用已有实例: {e}")
-        
-        # 创建一个包含close列的DataFrame
-        close_df = pd.DataFrame({'close': self.data['close']})
-        
         # 获取参数
         fast_period = self.params.get('fast_period', 10)
         slow_period = self.params.get('slow_period', 30)
         
+        # 获取指标计算器实例
+        try:
+            indicator_calculator = qindicator.get_indicator_calculator("talib")
+            if indicator_calculator is None:
+                raise ValueError("获取指标计算器失败")
+        except Exception as e:
+            logger.error(f"获取指标计算器失败: {e}")
+            raise
+        
+        # 创建一个包含close列的DataFrame
+        close_df = pd.DataFrame({'close': self.data['close']})
+        
         # 计算快速移动平均线
-        fast_ma_result = qindicator.calculate_ma(
-            close_df, 
-            timeperiod=fast_period
-        )
+        try:
+            fast_ma_result = indicator_calculator.calculate_ma(
+                close_df, 
+                timeperiod=fast_period
+            )
+        except Exception as e:
+            logger.error(f"计算快速移动平均线失败: {e}")
+            raise
         
         # 计算慢速移动平均线
-        slow_ma_result = qindicator.calculate_ma(
-            close_df, 
-            timeperiod=slow_period
-        )
+        try:
+            slow_ma_result = indicator_calculator.calculate_ma(
+                close_df, 
+                timeperiod=slow_period
+            )
+        except Exception as e:
+            logger.error(f"计算慢速移动平均线失败: {e}")
+            raise
         
         # 合并结果
         indicators_data = pd.DataFrame({

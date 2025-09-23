@@ -217,10 +217,14 @@ class StockAnalyzer:
             return False
     
     def send_email(self):
-        """发送邮件（注意：当前SmtpEmailer不支持附件）"""
+        """发送邮件并附加K线图"""
         if self.plot_file is None or not os.path.exists(self.plot_file):
             logger.warning("K线图文件不存在，将只发送邮件内容")
-            
+            attachments = None
+        else:
+            attachments = [self.plot_file]
+            logger.info(f"将附件 {self.plot_file} 添加到邮件中")
+        
         logger.info("正在发送邮件...")
         try:
             # 创建邮件发送器
@@ -246,13 +250,15 @@ class StockAnalyzer:
             body += f"买入信号数量: {len(self.signals['buy_signals'])}\n"
             body += f"卖出信号数量: {len(self.signals['sell_signals'])}\n\n"
             if self.plot_file and os.path.exists(self.plot_file):
-                body += f"K线图已保存至本地: {self.plot_file}\n\n"
+                body += f"K线图已作为附件发送，文件名: {os.path.basename(self.plot_file)}\n"
+                body += f"同时也保存至本地: {self.plot_file}\n\n"
             body += f"报告生成时间: {current_time}\n"
             
-            # 发送邮件（不包含附件，因为当前SmtpEmailer不支持）
-            emailer.send(
+            # 发送带附件的邮件
+            emailer.send_email_with_attachments(
                 subject=subject,
-                body=body
+                body=body,
+                attachments=attachments
             )
             
             logger.info(f"邮件已成功发送至: {self.email_config['to_addrs']}")
@@ -287,9 +293,9 @@ class StockAnalyzer:
 def main():
     """主函数"""
     # 设置默认参数
-    stock_code = "600519"  # 贵州茅台
+    stock_code = "300626"  # 贵州茅台
     end_date = datetime.now().strftime('%Y-%m-%d')
-    start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+    start_date = (datetime.now() - timedelta(days=120)).strftime('%Y-%m-%d')
     
     # 初始化分析器
     analyzer = StockAnalyzer(
