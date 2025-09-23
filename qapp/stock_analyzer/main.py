@@ -8,16 +8,17 @@
 
 import os
 import sys
-
-# 添加项目根目录到Python路径
-
 import logging
+
+# 导入必要的模块
 import qdata
 import qstrategy
 import qplot
 import pandas as pd
 from datetime import datetime, timedelta
 from qbackengine.emailer import SmtpEmailer
+# 导入 PyechartsChart_1 类
+from qplot.backends.pyecharts.chart_1 import PyechartsChart_1
 
 # 配置日志
 logging.basicConfig(
@@ -60,7 +61,7 @@ class StockAnalyzer:
         
         # 初始化各模块
         qdata.init()
-        qdata.set_current_provider('akshare')
+        # qdata.set_current_provider('akshare') - 这个函数不存在，qdata.init()已经设置了默认数据源为akshare
         logger.info("qdata 初始化完成，数据源设置为 akshare")
         # qstrategy.init()
         
@@ -107,8 +108,8 @@ class StockAnalyzer:
                 printlog=True
             )
             
-            # 初始化策略
-            strategy.init_strategy(self.data)
+            # 初始化策略数据 - 修正方法名：init_data 而不是 init_strategy
+            strategy.init_data(self.data)
             
             # 生成交易信号
             self.signals = strategy.generate_signals()
@@ -147,37 +148,79 @@ class StockAnalyzer:
         
         logger.info(f"正在绘制股票 {self.stock_code} 的K线图并标记交易信号...")
         try:
-            # 创建数据管理器
-            data_manager = qplot.DataManager(symbol=self.stock_code, data_type='daily')
-            data_manager.update_data(self.data)
-            
             # 生成文件名
             timestamp = datetime.now().strftime('%Y%m%d')
             self.plot_file = os.path.join(self.output_dir, f"{self.stock_code}_{timestamp}_kline.png")
             
-            # 绘制K线图
-            # fig = qplot.plot_kline(
-            #     self.stock_code,
-            #     title=f"{self.stock_code} 日K线图 (买卖信号标记)",
-            #     style='charles',
-            #     volume=True,
-            #     indicators=['ma5', 'ma10', 'ma20'],
-            #     figsize=(14, 10),
-            #     save_path=self.plot_file
-            # )
+            # 计算均线数据
+            def calculate_ma(df, periods=[5, 10, 20]):
+                ma_data = {}
+                for period in periods:
+                    ma_column = f'MA{period}'
+                    df[ma_column] = df['close'].rolling(window=period).mean()
+                    ma_data[ma_column] = df[ma_column].tolist()
+                return ma_data
             
-            logger.info(f"K线图已保存至: {self.plot_file}")
-            return True
+            ma_data = calculate_ma(self.data)
+            
+            # 格式化买卖信号数据
+            # 从 self.signals 中提取买点和卖点
+            signal_points = {'buy': [], 'sell': []}
+            
+            # 格式化日期并添加买点
+            for buy_date in self.signals['buy_signals']:
+                # 将日期转换为字符串格式
+                date_str = str(pd.to_datetime(buy_date).date())
+                # 查找该日期在数据中的位置
+                if date_str in [str(idx.date()) for idx in self.data.index]:
+                    # 获取该日期的最低价并稍微降低作为买点标记位置
+                    date_idx = self.data.index.get_loc(pd.to_datetime(buy_date))
+                    buy_price = self.data.iloc[date_idx]['low'] * 0.99
+                    signal_points['buy'].append((date_str, buy_price))
+            
+            # 格式化日期并添加卖点
+            for sell_date in self.signals['sell_signals']:
+                # 将日期转换为字符串格式
+                date_str = str(pd.to_datetime(sell_date).date())
+                # 查找该日期在数据中的位置
+                if date_str in [str(idx.date()) for idx in self.data.index]:
+                    # 获取该日期的最高价并稍微提高作为卖点标记位置
+                    date_idx = self.data.index.get_loc(pd.to_datetime(sell_date))
+                    sell_price = self.data.iloc[date_idx]['high'] * 1.01
+                    signal_points['sell'].append((date_str, sell_price))
+            
+            # 创建PyechartsChart_1实例
+            chart = PyechartsChart_1(
+                chart_type='kline',
+                data=self.data,
+                title=f"{self.stock_code} 日K线图 (买卖信号标记)"
+            )
+            
+            # 绘制K线图并标记买卖信号
+            chart.chart = chart.draw_klines(
+                self.data,
+                ma_data=ma_data,
+                signal_points=signal_points
+            )
+            
+            # 保存为图片
+            result = chart.save(self.plot_file)
+            
+            if os.path.exists(self.plot_file):
+                logger.info(f"K线图已保存至: {self.plot_file}")
+                return True
+            else:
+                logger.error("保存图片失败")
+                return False
         except Exception as e:
             logger.error(f"绘制K线图时出错: {e}")
             return False
     
     def send_email(self):
-        """发送包含图表的邮件"""
+        """发送邮件（注意：当前SmtpEmailer不支持附件）"""
         if self.plot_file is None or not os.path.exists(self.plot_file):
-            logger.error("请先绘制并保存K线图")
-            return False
-        
+            logger.warning("K线图文件不存在，将只发送邮件内容")
+            
         logger.info("正在发送邮件...")
         try:
             # 创建邮件发送器
@@ -195,21 +238,21 @@ class StockAnalyzer:
             subject = f"股票分析报告 - {self.stock_code} - {current_time}"
             
             # 构建邮件正文
-            body = f"""股票分析报告\n\n""".strip()
+            body = f"""股票分析报告\n\n"""
             body += f"股票代码: {self.stock_code}\n"
             body += f"分析区间: {self.start_date} 至 {self.end_date}\n"
             body += f"使用策略: {self.strategy_name}\n"
             body += f"策略参数: {self.strategy_params}\n\n"
             body += f"买入信号数量: {len(self.signals['buy_signals'])}\n"
             body += f"卖出信号数量: {len(self.signals['sell_signals'])}\n\n"
-            body += "请查看附件中的K线图，其中标记了买卖信号。\n\n"
+            if self.plot_file and os.path.exists(self.plot_file):
+                body += f"K线图已保存至本地: {self.plot_file}\n\n"
             body += f"报告生成时间: {current_time}\n"
             
-            # 发送邮件
-            emailer.send_email_with_attachments(
+            # 发送邮件（不包含附件，因为当前SmtpEmailer不支持）
+            emailer.send(
                 subject=subject,
-                body=body,
-                attachments=[self.plot_file]
+                body=body
             )
             
             logger.info(f"邮件已成功发送至: {self.email_config['to_addrs']}")
