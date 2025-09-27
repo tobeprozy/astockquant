@@ -142,6 +142,116 @@ class AkShareProvider(DataProvider):
         raise RuntimeError(
             f"获取分钟数据失败: {symbol} (从 {start_time} 到 {end_time}, 频率: {frequency}分钟)"
         ) from last_err
+        
+    def get_zh_a_minute_data(self, symbol: str, period: str = '1', adjust: str = "qfq", **kwargs) -> pd.DataFrame:
+        """
+        获取A股分时数据
+        
+        Args:
+            symbol: A股代码，例如'sh600751'
+            period: 时间频率，例如'1'表示1分钟
+            adjust: 复权类型，可选'qfq'(前复权)、'hfq'(后复权)或空字符串(不复权)
+            **kwargs: 额外参数
+            
+        Returns:
+            DataFrame: 包含开盘价、最高价、最低价、收盘价、成交量等数据的DataFrame
+        """
+        last_err = None
+        
+        # 重试逻辑
+        for i in range(self.retry_count):
+            try:
+                # 调用ak.stock_zh_a_minute获取A股分时数据
+                df = ak.stock_zh_a_minute(symbol=symbol, period=period, adjust=adjust)
+                
+                if not df.empty:
+                    # 对A股分时数据进行标准化处理
+                    return self._format_akshare_data(df, data_type='zh_a_minute')
+                
+            except Exception as e:
+                last_err = e
+                if i < self.retry_count - 1:
+                    time.sleep(self.retry_delay[i] if i < len(self.retry_delay) else self.retry_delay[-1])
+                continue
+        
+        raise RuntimeError(
+            f"获取A股分时数据失败: {symbol} (频率: {period}分钟, 复权: {adjust})"
+        ) from last_err
+    
+    def get_us_stock_minute_data(self, symbol: str, start_time: str = None, end_time: str = None, **kwargs) -> pd.DataFrame:
+        """
+        获取美股分钟数据
+        
+        Args:
+            symbol: 美股代码
+            start_time: 开始时间，格式为'YYYY-MM-DD HH:MM:SS'或'YYYY-MM-DD'，默认None
+            end_time: 结束时间，格式为'YYYY-MM-DD HH:MM:SS'或'YYYY-MM-DD'，默认None
+            **kwargs: 额外参数
+            
+        Returns:
+            DataFrame: 包含开盘价、最高价、最低价、收盘价、成交量等数据的DataFrame
+        """
+        last_err = None
+        
+        # 重试逻辑
+        for i in range(self.retry_count):
+            try:
+                # 由于akshare的美股分钟数据API可能有特定参数要求，这里先使用简单调用
+                df = ak.stock_us_hist_min_em(symbol=symbol)
+                
+                if not df.empty:
+                    # 美股数据可能有特殊的列名或格式，需要进行额外处理
+                    # 对美股数据进行标准化处理
+                    return self._format_akshare_data(df, data_type='us_stock_minute')
+                
+            except Exception as e:
+                last_err = e
+                if i < self.retry_count - 1:
+                    time.sleep(self.retry_delay[i] if i < len(self.retry_delay) else self.retry_delay[-1])
+                continue
+        
+        raise RuntimeError(
+            f"获取美股分钟数据失败: {symbol}"
+        ) from last_err
+    
+    def get_us_stock_daily_data(self, symbol: str, start_date: str, end_date: str, **kwargs) -> pd.DataFrame:
+        """
+        获取美股日线数据
+        
+        Args:
+            symbol: 美股代码
+            start_date: 开始日期，格式为'YYYY-MM-DD'
+            end_date: 结束日期，格式为'YYYY-MM-DD'
+            **kwargs: 额外参数
+            
+        Returns:
+            DataFrame: 包含开盘价、最高价、最低价、收盘价、成交量等数据的DataFrame
+        """
+        last_err = None
+        
+        # 重试逻辑
+        for i in range(self.retry_count):
+            try:
+                # 格式化日期为akshare所需的格式
+                start_date_fmt = start_date.replace('-', '')
+                end_date_fmt = end_date.replace('-', '')
+                
+                # 调用akshare获取美股日线数据
+                df = ak.stock_us_daily(symbol=symbol, start_date=start_date_fmt, end_date=end_date_fmt)
+                
+                if not df.empty:
+                    # 对美股数据进行标准化处理
+                    return self._format_akshare_data(df, data_type='us_stock')
+                
+            except Exception as e:
+                last_err = e
+                if i < self.retry_count - 1:
+                    time.sleep(self.retry_delay[i] if i < len(self.retry_delay) else self.retry_delay[-1])
+                continue
+        
+        raise RuntimeError(
+            f"获取美股日线数据失败: {symbol} (从 {start_date} 到 {end_date})"
+        ) from last_err
     
     def get_stock_list(self, **kwargs) -> pd.DataFrame:
         """
@@ -208,6 +318,7 @@ class AkShareProvider(DataProvider):
         column_mapping = {
             '日期': 'date',
             '时间': 'date',  # 分钟数据使用'时间'列作为日期
+            'day': 'date',  # 分时数据中可能使用'day'列作为日期
             '开盘': 'open',
             '开盘价': 'open',
             '最高': 'high',
