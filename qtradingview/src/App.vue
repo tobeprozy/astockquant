@@ -1,5 +1,5 @@
 <script setup>
-import TradingViewChart from './components/TradingViewChartRoW.vue'
+import TradingViewChart from './components/TradingViewChartQData.vue'
 </script>
 
 <template>
