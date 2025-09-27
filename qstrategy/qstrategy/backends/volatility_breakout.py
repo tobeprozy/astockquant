@@ -127,23 +127,23 @@ class VolatilityBreakoutStrategy(Strategy):
         
         return BacktraderVolatilityBreakoutStrategy
     
-    def calculate_indicators(self, data: pd.DataFrame) -> Dict[str, Any]:
+    def calculate_indicators(self) -> Dict[str, Any]:
         """
         计算波动率突破策略的指标
-        
-        Args:
-            data: 用于计算指标的数据
         
         Returns:
             包含指标计算结果的字典
         """
+        if self.data is None:
+            raise ValueError("策略数据未初始化，请先调用init_data方法")
+            
         try:
             # 计算波动率（使用收盘价的标准差）
-            self.volatility = data['close'].rolling(window=self.params.window).std()
+            self.volatility = self.data['close'].rolling(window=self.params.window).std()
             
             # 计算上下轨
-            self.upper_band = data['close'] + self.params.multiplier * self.volatility
-            self.lower_band = data['close'] - self.params.multiplier * self.volatility
+            self.upper_band = self.data['close'] + self.params.multiplier * self.volatility
+            self.lower_band = self.data['close'] - self.params.multiplier * self.volatility
             
             return {
                 'volatility': self.volatility,
@@ -152,30 +152,28 @@ class VolatilityBreakoutStrategy(Strategy):
             }
         except Exception as e:
             logger.error(f"计算指标失败: {str(e)}")
-            raise StrategyError(f"计算指标失败: {str(e)}")
+            raise ValueError(f"计算指标失败: {str(e)}")
     
-    def generate_signals(self, data: pd.DataFrame, indicators: Dict[str, Any] = None) -> Dict[str, Any]:
+    def generate_signals(self) -> Dict[str, Any]:
         """
         基于波动率突破生成交易信号
-        
-        Args:
-            data: 用于生成信号的数据
-            indicators: 已计算的指标，如果为None则重新计算
         
         Returns:
             包含交易信号的字典
         """
+        if self.data is None:
+            raise ValueError("策略数据未初始化，请先调用init_data方法")
+            
         try:
-            # 如果没有提供指标，则计算
-            if indicators is None:
-                indicators = self.calculate_indicators(data)
-                
+            # 计算指标
+            indicators = self.calculate_indicators()
+            
             upper_band = indicators['upper_band']
             lower_band = indicators['lower_band']
             
             # 创建信号DataFrame
-            signals = pd.DataFrame(index=data.index)
-            signals['price'] = data['close']
+            signals = pd.DataFrame(index=self.data.index)
+            signals['price'] = self.data['close']
             signals['upper_band'] = upper_band
             signals['lower_band'] = lower_band
             
@@ -193,30 +191,32 @@ class VolatilityBreakoutStrategy(Strategy):
             if self.params.printlog:
                 logger.info(f"生成信号: 买入信号{len(buy_signals)}个, 卖出信号{len(sell_signals)}个")
                 
-            return {
+            # 保存信号
+            self._signals = {
                 'signals': signals,
                 'buy_signals': buy_signals,
                 'sell_signals': sell_signals
             }
+            
+            return self._signals
         except Exception as e:
             logger.error(f"生成信号失败: {str(e)}")
-            raise StrategyError(f"生成信号失败: {str(e)}")
+            raise ValueError(f"生成信号失败: {str(e)}")
     
-    def execute_trade(self, data: pd.DataFrame, signals: Dict[str, Any] = None) -> Dict[str, Any]:
+    def execute_trade(self) -> Dict[str, Any]:
         """
         执行交易
-        
-        Args:
-            data: 交易数据
-            signals: 交易信号，如果为None则重新生成
         
         Returns:
             交易结果
         """
+        if self.data is None:
+            raise ValueError("策略数据未初始化，请先调用init_data方法")
+            
         try:
-            # 如果没有提供信号，则生成
-            if signals is None:
-                signals = self.generate_signals(data)
+            # 如果没有生成信号，则先生成
+            if self._signals is None:
+                self.generate_signals()
                 
             transactions = []
             total_profit = 0.0
@@ -224,10 +224,10 @@ class VolatilityBreakoutStrategy(Strategy):
             buy_price = 0.0
             
             # 遍历所有交易日
-            for date in data.index:
+            for date in self.data.index:
                 # 执行买入信号
-                if date in signals['buy_signals'] and not position:
-                    price = data.loc[date, 'close']
+                if date in self._signals['buy_signals'] and not position:
+                    price = self.data.loc[date, 'close']
                     transactions.append({
                         'date': date,
                         'type': 'buy',
@@ -242,8 +242,8 @@ class VolatilityBreakoutStrategy(Strategy):
                         logger.info(f"买入信号: {date}, 价格: {price:.2f}")
                 
                 # 执行卖出信号
-                elif date in signals['sell_signals'] and position:
-                    price = data.loc[date, 'close']
+                elif date in self._signals['sell_signals'] and position:
+                    price = self.data.loc[date, 'close']
                     profit = (price - buy_price) * self.params.size
                     total_profit += profit
                     
@@ -261,16 +261,18 @@ class VolatilityBreakoutStrategy(Strategy):
                         logger.info(f"卖出信号: {date}, 价格: {price:.2f}, 利润: {profit:.2f}")
             
             # 返回交易结果
-            return {
+            result = {
                 'transactions': transactions,
-                'total_buys': len(signals['buy_signals']),
-                'total_sells': len(signals['sell_signals']),
+                'total_buys': len(self._signals['buy_signals']),
+                'total_sells': len(self._signals['sell_signals']),
                 'total_profit': total_profit,
                 'final_position': 'holding' if position else 'cash'
             }
+            
+            return result
         except Exception as e:
             logger.error(f"执行交易失败: {str(e)}")
-            raise StrategyError(f"执行交易失败: {str(e)}")
+            raise ValueError(f"执行交易失败: {str(e)}")
 
 # 注册策略
 register_strategy('volatility_breakout', VolatilityBreakoutStrategy)

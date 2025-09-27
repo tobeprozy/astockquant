@@ -143,11 +143,8 @@ class SMACrossStrategy(Strategy):
         if self.data is None:
             raise ValueError("策略数据未初始化，请先调用init_data方法")
         
-        # 确保qindicator已初始化
-        try:
-            qindicator.init()
-        except Exception as e:
-            logger.warning(f"初始化qindicator失败，使用已有实例: {e}")
+        # 获取指标计算器实例
+        calculator = qindicator.get_indicator_calculator('talib')
         
         # 创建一个包含close列的DataFrame
         close_df = pd.DataFrame({'close': self.data['close']})
@@ -157,13 +154,13 @@ class SMACrossStrategy(Strategy):
         slow_period = self.params.get('slow_period', 30)
         
         # 计算快速移动平均线
-        fast_ma_result = qindicator.calculate_ma(
+        fast_ma_result = calculator.calculate_ma(
             close_df, 
             timeperiod=fast_period
         )
         
         # 计算慢速移动平均线
-        slow_ma_result = qindicator.calculate_ma(
+        slow_ma_result = calculator.calculate_ma(
             close_df, 
             timeperiod=slow_period
         )

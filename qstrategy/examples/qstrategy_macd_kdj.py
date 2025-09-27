@@ -91,9 +91,9 @@ def main():
         print(f"总利润: {results['total_profit']:.2f}")
         
         # 打印一些交易详情
-        if results['trades']:
+        if results['transactions']:
             print("\n部分交易详情：")
-            for i, tx in enumerate(results['trades'][:3]):
+            for i, tx in enumerate(results['transactions'][:3]):
                 print(f"交易{i+1}: {tx['date']} - {tx['type']} @ {tx['price']:.2f}")
         
         # 策略评估

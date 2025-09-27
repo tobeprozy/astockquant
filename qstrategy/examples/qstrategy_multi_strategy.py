@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 import qindicator
 import qstrategy
 
-qindicator.init()
+# 移除不存在的qindicator.init()调用
 qstrategy.init()
 
 def generate_sample_stock_data(start_date='2020-01-01', end_date='2023-12-31', price_level=100, volatility=0.02, trend_strength=0.001):

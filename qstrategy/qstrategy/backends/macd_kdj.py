@@ -5,6 +5,7 @@ from typing import Dict, Any
 import backtrader as bt  # 已添加backtrader导入
 from qstrategy.core.strategy import Strategy
 from qstrategy.backends import register_strategy
+import qindicator  # 添加qindicator模块导入
 
 logger = logging.getLogger(__name__)
 
@@ -129,8 +130,11 @@ class MACDKDJStrategy(Strategy):
             if self.data is None:
                 raise ValueError("策略数据未初始化，请先调用init_data方法")
                 
-            # 计算MACD指标
-            macd_df = self.qindicator.calculate_macd(
+            # 获取指标计算器实例（修复：使用qindicator模块的工厂函数）
+            calculator = qindicator.get_indicator_calculator('talib')
+            
+            # 计算MACD指标（修复：使用calculator实例而非self.qindicator）
+            macd_df = calculator.calculate_macd(
                 self.data, 
                 fastperiod=self.params.get('macd_fast_period'), 
                 slowperiod=self.params.get('macd_slow_period'),
@@ -249,9 +253,9 @@ class MACDKDJStrategy(Strategy):
             position = 0  # 0表示空仓，大于0表示持仓
             buy_price = 0.0
             
-            # 获取交易参数
-            size = self.params.get('size')
-            printlog = self.params.get('printlog')
+            # 获取交易参数（修复：为size提供默认值）
+            size = self.params.get('size', 100)  # 添加默认值100
+            printlog = self.params.get('printlog', False)  # 为printlog也添加默认值
             
             # 遍历所有交易日
             for date in self.data.index:
