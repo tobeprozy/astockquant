@@ -21,17 +21,17 @@ def main():
     
     # 创建均值回归策略回测引擎
     engine = qbackengine.create_backtrader_engine(
-        symbol='600000',  # 茅台股票代码
+        symbol='600000',  # 股票代码
         start_date='2024-01-01',
         end_date='2024-12-31',
-        strategy_name='MeanReversion',  # 使用qstrategy中的均值回归策略
+        strategy_name='mean_reversion',  # 使用正确的策略名称（小写字母加下划线）
         starting_cash=100000.0,
         commission=0.00025,
         strategy_kwargs={
             'period': 20,  # 均值计算周期
             'z_score_threshold': 2.0,  # Z-score交易阈值
             'printlog': True,  # 打印交易日志
-            'size': 1000        # 交易数量（股）
+            'size': 1000  # 交易数量（股）
         }
     )
     

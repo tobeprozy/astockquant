@@ -165,7 +165,7 @@ def _auto_register_strategies():
     """
     try:
         # 导入内置策略
-        from qstrategy.backends import sma_cross, macd, rsi, bbands, pair_trading
+        from qstrategy.backends import sma_cross, macd, rsi, bbands, pair_trading, volatility_breakout
         from qstrategy.backends import mean_reversion
         from qstrategy.backends import macd_kdj
         from qstrategy.backends import turtle

@@ -9,7 +9,7 @@ MACD策略实现
 import pandas as pd
 from typing import Dict, Any
 import logging
-
+import backtrader as bt  # 已添加backtrader导入
 from qstrategy.core.strategy import Strategy
 from qstrategy.backends import register_strategy
 import qindicator
@@ -22,37 +22,114 @@ class MACDStrategy(Strategy):
     当MACD线穿过信号线时产生交易信号
     """
     
-    def __init__(self, **kwargs):
+    # 类级别默认参数，简化代码
+    default_params = {
+        'fast_period': 12,
+        'slow_period': 26,
+        'signal_period': 9,
+        'printlog': False,
+        'size': 100
+    }
+    
+    def __init__(self, data=None, **kwargs):
         """
         初始化策略
         
         Args:
+            data: 可选的backtrader数据对象（用于backtrader引擎）
             **kwargs: 策略参数
-                fast_period: 快线周期，默认12
-                slow_period: 慢线周期，默认26
-                signal_period: 信号线周期，默认9
-                printlog: 是否打印日志，默认False
-                size: 交易数量（股），默认100
         """
-        # 设置默认参数
-        default_params = {
-            'fast_period': 12,
-            'slow_period': 26,
-            'signal_period': 9,
-            'printlog': False,
-            'size': 100
-        }
-        
         # 合并用户参数和默认参数
-        default_params.update(kwargs)
+        merged_params = self.default_params.copy()
+        merged_params.update(kwargs)
         
-        super().__init__(**default_params)
+        super().__init__(**merged_params)
         
         # 初始化指标
         self._macd = None
         self._macd_signal = None
         self._macd_hist = None
         self._indicators_data = None
+
+    def get_backtrader_strategy(self):
+        """
+        获取兼容backtrader的策略类
+        使策略能在BacktraderEngine中运行
+        """
+        # 定义backtrader策略类
+        class BacktraderMACDStrategy(bt.Strategy):
+            # 使用类级别默认参数
+            params = tuple((k, v) for k, v in MACDStrategy.default_params.items())
+            
+            def __init__(self):
+                # 初始化MACD指标
+                self.macd = bt.indicators.MACD(
+                    self.data.close,
+                    period_me1=self.p.fast_period,
+                    period_me2=self.p.slow_period,
+                    period_signal=self.p.signal_period
+                )
+                
+                # 交易状态跟踪
+                self.order = None
+                self.buyprice = None
+                self.buycomm = None
+            
+            def log(self, txt, dt=None, doprint=False):
+                """日志函数"""
+                if self.p.printlog or doprint:
+                    dt = dt or self.datas[0].datetime.date(0)
+                    print(f'{dt.isoformat()}, {txt}')
+            
+            def notify_order(self, order):
+                """订单状态通知"""
+                if order.status in [order.Submitted, order.Accepted]:
+                    # 订单已提交或已接受，不做处理
+                    return
+                
+                if order.status in [order.Completed]:
+                    # 订单已完成
+                    if order.isbuy():  # 买入订单
+                        self.log(f'买入: 价格={order.executed.price:.2f}, 数量={order.executed.size}')
+                        self.buyprice = order.executed.price
+                        self.buycomm = order.executed.comm
+                    else:  # 卖出订单
+                        self.log(f'卖出: 价格={order.executed.price:.2f}, 数量={order.executed.size}')
+                
+                # 重置订单状态
+                self.order = None
+            
+            def notify_trade(self, trade):
+                """交易状态通知"""
+                if not trade.isclosed:
+                    return
+                
+                self.log(f'交易利润: 毛利润={trade.pnl:.2f}, 净利润={trade.pnlcomm:.2f}')
+            
+            def next(self):
+                """每个交易日执行一次"""
+                # 检查是否有挂单
+                if self.order:
+                    return
+                
+                # 检查当前持仓
+                if not self.position:
+                    # 空仓，寻找买入信号
+                    if self.macd.macd[0] > self.macd.signal[0] and self.macd.macd[-1] <= self.macd.signal[-1]:
+                        # MACD金叉，买入
+                        self.log(f'买入信号: MACD金叉')
+                        self.order = self.buy(size=self.p.size)
+                else:
+                    # 持仓，寻找卖出信号
+                    if self.macd.macd[0] < self.macd.signal[0] and self.macd.macd[-1] >= self.macd.signal[-1]:
+                        # MACD死叉，卖出
+                        self.log(f'卖出信号: MACD死叉')
+                        self.order = self.sell(size=self.p.size)
+            
+        return BacktraderMACDStrategy
+
+# 记得在文件顶部导入backtrader
+# import backtrader as bt
     
     def calculate_indicators(self) -> pd.DataFrame:
         """

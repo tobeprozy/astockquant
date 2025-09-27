@@ -9,6 +9,7 @@
 import pandas as pd
 from typing import Dict, Any
 import logging
+import backtrader as bt
 
 from qstrategy.core.strategy import Strategy
 from qstrategy.backends import register_strategy
@@ -22,34 +23,115 @@ class SMACrossStrategy(Strategy):
     当短期均线向上穿过长期均线时买入，当短期均线向下穿过长期均线时卖出
     """
     
+    # 直接在类级别定义默认参数
+    default_params = {
+        'fast_period': 10,
+        'slow_period': 30,
+        'printlog': False,
+        'size': 100
+    }
+    
     def __init__(self, **kwargs):
         """
         初始化策略
         
         Args:
             **kwargs: 策略参数
-                fast_period: 短期均线周期，默认10
-                slow_period: 长期均线周期，默认30
-                printlog: 是否打印日志，默认False
-                size: 交易数量（股），默认100
         """
-        # 设置默认参数
-        default_params = {
-            'fast_period': 10,
-            'slow_period': 30,
-            'printlog': False,
-            'size': 100
-        }
-        
         # 合并用户参数和默认参数
-        default_params.update(kwargs)
+        params = self.default_params.copy()
+        params.update(kwargs)
         
-        super().__init__(**default_params)
+        super().__init__(**params)
         
         # 初始化指标
         self._fast_ma = None
         self._slow_ma = None
         self._indicators_data = None
+    
+    def get_backtrader_strategy(self):
+        """
+        获取兼容backtrader的策略类
+        使策略能在BacktraderEngine中运行
+        """
+        # 定义backtrader策略类
+        class BacktraderSMACrossStrategy(bt.Strategy):
+            # 使用类级别默认参数
+            params = tuple((k, v) for k, v in SMACrossStrategy.default_params.items())
+            
+            def __init__(self):
+                # 初始化交易状态
+                self.order = None
+                self.buyprice = None
+                self.buycomm = None
+                
+                # 计算移动平均线
+                self.fast_ma = bt.indicators.SimpleMovingAverage(
+                    self.data.close, period=self.p.fast_period
+                )
+                self.slow_ma = bt.indicators.SimpleMovingAverage(
+                    self.data.close, period=self.p.slow_period
+                )
+                
+                # 用于判断交叉
+                self.crossover = bt.indicators.CrossOver(
+                    self.fast_ma, self.slow_ma
+                )
+            
+            def log(self, txt, dt=None):
+                """日志函数，用于记录交易执行情况"""
+                if self.p.printlog:
+                    dt = dt or self.data.datetime.date(0)
+                    print(f'{dt.isoformat()}, {txt}')
+            
+            def notify_order(self, order):
+                """订单状态通知"""
+                if order.status in [order.Submitted, order.Accepted]:
+                    # 订单已提交或已接受，不需要操作
+                    return
+                
+                # 检查订单是否完成
+                if order.status in [order.Completed]:
+                    if order.isbuy():  # 买入订单
+                        self.log(f'买入: 价格={order.executed.price:.2f}, 成本={order.executed.value:.2f}, 佣金={order.executed.comm:.2f}')
+                        self.buyprice = order.executed.price
+                        self.buycomm = order.executed.comm
+                    else:  # 卖出订单
+                        self.log(f'卖出: 价格={order.executed.price:.2f}, 收入={order.executed.value:.2f}, 佣金={order.executed.comm:.2f}')
+                    # 记录交易执行的价格和佣金
+                    
+                elif order.status in [order.Canceled, order.Margin, order.Rejected]:
+                    self.log('订单: 已取消/保证金不足/被拒绝')
+                
+                # 重置订单状态
+                self.order = None
+            
+            def notify_trade(self, trade):
+                """交易状态通知"""
+                if not trade.isclosed:
+                    return
+                
+                self.log(f'交易结果: 毛利润={trade.pnl:.2f}, 净利润={trade.pnlcomm:.2f}')
+            
+            def next(self):
+                """每个时间点的交易逻辑"""
+                # 检查是否有未完成的订单
+                if self.order:
+                    return
+                
+                # 金叉信号：短期均线上穿长期均线
+                if self.crossover > 0 and not self.position:
+                    # 买入
+                    self.log(f'买入信号: 价格={self.data.close[0]:.2f}')
+                    self.order = self.buy(size=self.p.size)
+                
+                # 死叉信号：短期均线下穿长期均线
+                elif self.crossover < 0 and self.position:
+                    # 卖出
+                    self.log(f'卖出信号: 价格={self.data.close[0]:.2f}')
+                    self.order = self.sell(size=self.p.size)
+        
+        return BacktraderSMACrossStrategy
     
     def calculate_indicators(self) -> pd.DataFrame:
         """
@@ -61,41 +143,30 @@ class SMACrossStrategy(Strategy):
         if self.data is None:
             raise ValueError("策略数据未初始化，请先调用init_data方法")
         
-        # 获取参数
-        fast_period = self.params.get('fast_period', 10)
-        slow_period = self.params.get('slow_period', 30)
-        
-        # 获取指标计算器实例
+        # 确保qindicator已初始化
         try:
-            indicator_calculator = qindicator.get_indicator_calculator("talib")
-            if indicator_calculator is None:
-                raise ValueError("获取指标计算器失败")
+            qindicator.init()
         except Exception as e:
-            logger.error(f"获取指标计算器失败: {e}")
-            raise
+            logger.warning(f"初始化qindicator失败，使用已有实例: {e}")
         
         # 创建一个包含close列的DataFrame
         close_df = pd.DataFrame({'close': self.data['close']})
         
+        # 获取参数
+        fast_period = self.params.get('fast_period', 10)
+        slow_period = self.params.get('slow_period', 30)
+        
         # 计算快速移动平均线
-        try:
-            fast_ma_result = indicator_calculator.calculate_ma(
-                close_df, 
-                timeperiod=fast_period
-            )
-        except Exception as e:
-            logger.error(f"计算快速移动平均线失败: {e}")
-            raise
+        fast_ma_result = qindicator.calculate_ma(
+            close_df, 
+            timeperiod=fast_period
+        )
         
         # 计算慢速移动平均线
-        try:
-            slow_ma_result = indicator_calculator.calculate_ma(
-                close_df, 
-                timeperiod=slow_period
-            )
-        except Exception as e:
-            logger.error(f"计算慢速移动平均线失败: {e}")
-            raise
+        slow_ma_result = qindicator.calculate_ma(
+            close_df, 
+            timeperiod=slow_period
+        )
         
         # 合并结果
         indicators_data = pd.DataFrame({

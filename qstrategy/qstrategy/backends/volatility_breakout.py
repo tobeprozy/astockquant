@@ -1,6 +1,11 @@
+# 修改导入部分
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import pandas as pd
 import numpy as np
 import logging
+import backtrader as bt
 from typing import Dict, Any
 from qstrategy.core.strategy import Strategy
 from qstrategy.backends import register_strategy
@@ -14,6 +19,14 @@ class VolatilityBreakoutStrategy(Strategy):
     当价格突破近期波动率上限时买入，当价格跌破近期波动率下限时卖出
     """
     
+    # 直接在类级别定义默认参数
+    default_params = {
+        'window': 20,
+        'multiplier': 2.0,
+        'printlog': False,
+        'size': 100
+    }
+    
     def __init__(self, **kwargs):
         """
         初始化波动率突破策略
@@ -24,25 +37,96 @@ class VolatilityBreakoutStrategy(Strategy):
             printlog: 是否打印日志，默认False
             size: 交易数量，默认100
         """
-        # 设置默认参数
-        default_params = {
-            'window': 20,
-            'multiplier': 2.0,
-            'printlog': False,
-            'size': 100
-        }
-        
-        # 更新默认参数
-        default_params.update(kwargs)
+        # 合并用户参数和默认参数
+        params = self.default_params.copy()
+        params.update(kwargs)
         
         # 调用父类初始化
-        super().__init__(**default_params)
+        super().__init__(**params)
         
         # 初始化指标属性
         self.volatility = None
         self.upper_band = None
         self.lower_band = None
+    
+    def get_backtrader_strategy(self):
+        """
+        获取兼容backtrader的策略类
+        使策略能在BacktraderEngine中运行
+        """
+        # 定义backtrader策略类
+        class BacktraderVolatilityBreakoutStrategy(bt.Strategy):
+            # 使用类级别默认参数
+            params = tuple((k, v) for k, v in VolatilityBreakoutStrategy.default_params.items())
+            
+            def __init__(self):
+                # 初始化交易状态
+                self.order = None
+                self.buyprice = None
+                self.buycomm = None
+                
+                # 计算波动率（使用标准差）
+                self.volatility = bt.indicators.StandardDeviation(
+                    self.data.close, period=self.p.window
+                )
+                
+                # 计算上下轨
+                self.upper_band = self.data.close + self.p.multiplier * self.volatility
+                self.lower_band = self.data.close - self.p.multiplier * self.volatility
+            
+            def log(self, txt, dt=None):
+                """日志函数，用于记录交易执行情况"""
+                if self.p.printlog:
+                    dt = dt or self.data.datetime.date(0)
+                    print(f'{dt.isoformat()}, {txt}')
+            
+            def notify_order(self, order):
+                """订单状态通知"""
+                if order.status in [order.Submitted, order.Accepted]:
+                    # 订单已提交或已接受，不需要操作
+                    return
+                
+                # 检查订单是否完成
+                if order.status in [order.Completed]:
+                    if order.isbuy():  # 买入订单
+                        self.log(f'买入: 价格={order.executed.price:.2f}, 成本={order.executed.value:.2f}, 佣金={order.executed.comm:.2f}')
+                        self.buyprice = order.executed.price
+                        self.buycomm = order.executed.comm
+                    else:  # 卖出订单
+                        self.log(f'卖出: 价格={order.executed.price:.2f}, 收入={order.executed.value:.2f}, 佣金={order.executed.comm:.2f}')
+                    # 记录交易执行的价格和佣金
+                    
+                elif order.status in [order.Canceled, order.Margin, order.Rejected]:
+                    self.log('订单: 已取消/保证金不足/被拒绝')
+                
+                # 重置订单状态
+                self.order = None
+            
+            def notify_trade(self, trade):
+                """交易状态通知"""
+                if not trade.isclosed:
+                    return
+                
+                self.log(f'交易结果: 毛利润={trade.pnl:.2f}, 净利润={trade.pnlcomm:.2f}')
+            
+            def next(self):
+                """每个时间点的交易逻辑"""
+                # 检查是否有未完成的订单
+                if self.order:
+                    return
+                
+                # 当价格突破上轨且当前没有持仓时买入
+                if self.data.close[0] > self.upper_band[0] and not self.position:
+                    self.log(f'买入信号: 价格={self.data.close[0]:.2f}, 上轨={self.upper_band[0]:.2f}')
+                    self.order = self.buy(size=self.p.size)
+                
+                # 当价格跌破下轨且当前有持仓时卖出
+                elif self.data.close[0] < self.lower_band[0] and self.position:
+                    self.log(f'卖出信号: 价格={self.data.close[0]:.2f}, 下轨={self.lower_band[0]:.2f}')
+                    self.order = self.sell(size=self.p.size)
         
+        return BacktraderVolatilityBreakoutStrategy
+    
     def calculate_indicators(self, data: pd.DataFrame) -> Dict[str, Any]:
         """
         计算波动率突破策略的指标
@@ -189,4 +273,4 @@ class VolatilityBreakoutStrategy(Strategy):
             raise StrategyError(f"执行交易失败: {str(e)}")
 
 # 注册策略
-signals = register_strategy('volatility_breakout', VolatilityBreakoutStrategy)
+register_strategy('volatility_breakout', VolatilityBreakoutStrategy)

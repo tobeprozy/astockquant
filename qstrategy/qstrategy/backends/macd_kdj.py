@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import logging
 from typing import Dict, Any
+import backtrader as bt  # 已添加backtrader导入
 from qstrategy.core.strategy import Strategy
 from qstrategy.backends import register_strategy
 
@@ -13,55 +14,66 @@ class MACDKDJStrategy(Strategy):
     结合MACD和KDJ指标生成交易信号
     """
     
-    def __init__(self, **kwargs):
+    # 直接在类级别定义默认参数
+    default_params = {
+        'macd_fast_period': 12,
+        'macd_slow_period': 26,
+        'macd_signal_period': 9,
+        'kdj_period': 9,
+        'kdj_slow_period': 3,
+        'kdj_overbought': 80,
+        'kdj_oversold': 20,
+        'printlog': False,
+        'size': 100
+    }
+    
+    def __init__(self, *args, **kwargs):
         """
         初始化MACD+KDJ策略
-        
-        Args:
-            macd_fast_period: MACD快线周期，默认12
-            macd_slow_period: MACD慢线周期，默认26
-            macd_signal_period: MACD信号线周期，默认9
-            kdj_period: KDJ周期，默认9
-            kdj_slow_period: KDJ慢速K周期，默认3
-            kdj_overbought: KDJ超买阈值，默认80
-            kdj_oversold: KDJ超卖阈值，默认20
-            printlog: 是否打印日志，默认False
-            size: 交易数量，默认100
         """
-        # 设置默认参数
-        default_params = {
-            'macd_fast_period': 12,
-            'macd_slow_period': 26,
-            'macd_signal_period': 9,
-            'kdj_period': 9,
-            'kdj_slow_period': 3,
-            'kdj_overbought': 80,
-            'kdj_oversold': 20,
-            'printlog': False,
-            'size': 100
-        }
-        
-        # 更新默认参数
-        default_params.update(kwargs)
-        
-        # 调用父类初始化
-        super().__init__(**default_params)
-        
-        # 导入qindicator
-        try:
-            import qindicator
-            self.qindicator = qindicator
-        except ImportError:
-            logger.error("无法导入qindicator模块")
-            raise ValueError("无法导入qindicator模块")
-        
-        # 初始化指标属性
+        super().__init__(*args, **kwargs)
+        # 初始化指标变量
         self.macd = None
         self.macd_signal = None
         self.macd_hist = None
         self.k = None
         self.d = None
         self.j = None
+    
+    def get_backtrader_strategy(self):
+        """
+        获取兼容backtrader的策略类
+        """
+        # 使用类级别默认参数，避免作用域问题
+        class BacktraderMACDKDJStrategy(bt.Strategy):
+            # 直接使用类级别定义的默认参数
+            params = tuple((k, v) for k, v in MACDKDJStrategy.default_params.items())
+            
+            def __init__(self):
+                # 指标计算逻辑保持不变
+                self.macd = bt.indicators.MACD(
+                    self.data.close,
+                    period_me1=self.p.macd_fast_period,
+                    period_me2=self.p.macd_slow_period,
+                    period_signal=self.p.macd_signal_period
+                )
+                
+                # KDJ指标计算
+                self.low_min = bt.indicators.Lowest(self.data.low, period=self.p.kdj_period)
+                self.high_max = bt.indicators.Highest(self.data.high, period=self.p.kdj_period)
+                self.rsv = (self.data.close - self.low_min) / (self.high_max - self.low_min) * 100
+                self.k = bt.indicators.ExponentialMovingAverage(self.rsv, period=self.p.kdj_slow_period)
+                self.d = bt.indicators.ExponentialMovingAverage(self.k, period=self.p.kdj_slow_period)
+                self.j = 3 * self.k - 2 * self.d
+                
+                # 交易状态跟踪
+                self.order = None
+                self.buyprice = None
+                self.buycomm = None
+            
+            # 其余方法（log、notify_order、notify_trade、next等）保持不变
+            
+        return BacktraderMACDKDJStrategy
     
     def _calculate_kdj(self) -> Dict[str, pd.Series]:
         """

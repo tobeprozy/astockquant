@@ -9,6 +9,7 @@ RSI策略实现
 import pandas as pd
 from typing import Dict, Any
 import logging
+import backtrader as bt  # 添加backtrader导入
 
 from qstrategy.core.strategy import Strategy
 from qstrategy.backends import register_strategy
@@ -22,6 +23,15 @@ class RSIStrategy(Strategy):
     当RSI低于超卖阈值时买入，高于超买阈值时卖出
     """
     
+    # 直接在类级别定义默认参数
+    default_params = {
+        'timeperiod': 14,
+        'oversold': 30,
+        'overbought': 70,
+        'printlog': False,
+        'size': 100
+    }
+    
     def __init__(self, **kwargs):
         """
         初始化策略
@@ -34,19 +44,11 @@ class RSIStrategy(Strategy):
                 printlog: 是否打印日志，默认False
                 size: 交易数量（股），默认100
         """
-        # 设置默认参数
-        default_params = {
-            'timeperiod': 14,
-            'oversold': 30,
-            'overbought': 70,
-            'printlog': False,
-            'size': 100
-        }
-        
         # 合并用户参数和默认参数
-        default_params.update(kwargs)
+        params = self.default_params.copy()
+        params.update(kwargs)
         
-        super().__init__(**default_params)
+        super().__init__(**params)
         
         # 初始化指标
         self._rsi = None
@@ -211,6 +213,95 @@ class RSIStrategy(Strategy):
             self.log(f"交易结果: 总利润={total_profit:.2f}, 交易次数={len(trades)}")
         
         return result
+        
+    def get_backtrader_strategy(self):
+        """
+        获取兼容backtrader的策略类
+        该方法使策略能够在BacktraderEngine中运行
+        """
+        # 解决参数作用域问题的方法：创建一个封装函数
+        def make_backtrader_strategy(params_dict):
+            class BacktraderRSIStrategy(bt.Strategy):
+                # 设置参数
+                params = (
+                    ('timeperiod', params_dict.get('timeperiod', 14)),
+                    ('oversold', params_dict.get('oversold', 30)),
+                    ('overbought', params_dict.get('overbought', 70)),
+                    ('printlog', params_dict.get('printlog', False)),
+                    ('size', params_dict.get('size', 100))
+                )
+                
+                def __init__(self):
+                    # 初始化RSI指标
+                    self.rsi = bt.indicators.RSI_SMA(
+                        self.data.close, 
+                        period=self.p.timeperiod
+                    )
+                    
+                    # 初始化交易状态
+                    self.order = None
+                    self.buyprice = None
+                    self.buycomm = None
+                
+                def log(self, txt, dt=None, doprint=False):
+                    """日志函数，用于记录交易信息"""
+                    if self.p.printlog or doprint:
+                        dt = dt or self.datas[0].datetime.date(0)
+                        print(f'{dt.isoformat()}, {txt}')
+                
+                def notify_order(self, order):
+                    """订单状态变化回调"""
+                    if order.status in [order.Submitted, order.Accepted]:
+                        # 订单已提交或已接受，无需处理
+                        return
+                    
+                    # 检查订单是否完成
+                    if order.status in [order.Completed]:
+                        if order.isbuy():  # 买入订单
+                            self.log(f'买入执行: 价格={order.executed.price:.2f}, '\
+                                    f'成本={order.executed.value:.2f}, 佣金={order.executed.comm:.2f}')
+                            self.buyprice = order.executed.price
+                            self.buycomm = order.executed.comm
+                        else:  # 卖出订单
+                            self.log(f'卖出执行: 价格={order.executed.price:.2f}, '\
+                                    f'收入={order.executed.value:.2f}, 佣金={order.executed.comm:.2f}')
+                    elif order.status in [order.Canceled, order.Margin, order.Rejected]:
+                        self.log('订单 取消/保证金不足/拒绝')
+                    
+                    # 重置订单标志
+                    self.order = None
+                
+                def notify_trade(self, trade):
+                    """交易状态变化回调"""
+                    if not trade.isclosed:
+                        return
+                    
+                    self.log(f'交易利润: 毛利润={trade.pnl:.2f}, 净利润={trade.pnlcomm:.2f}')
+                
+                def next(self):
+                    """每个数据点执行一次的逻辑"""
+                    # 检查是否有未完成的订单
+                    if self.order:
+                        return
+                    
+                    # 检查是否已持仓
+                    if not self.position:
+                        # 未持仓，检查买入信号
+                        if self.rsi[0] < self.p.oversold:
+                            # RSI低于超卖阈值，买入
+                            self.log(f'买入信号: RSI={self.rsi[0]:.2f} < {self.p.oversold}')
+                            self.order = self.buy(size=self.p.size)
+                    else:
+                        # 已持仓，检查卖出信号
+                        if self.rsi[0] > self.p.overbought:
+                            # RSI高于超买阈值，卖出
+                            self.log(f'卖出信号: RSI={self.rsi[0]:.2f} > {self.p.overbought}')
+                            self.order = self.sell(size=self.p.size)
+            
+            return BacktraderRSIStrategy
+        
+        # 使用封装函数创建并返回策略类
+        return make_backtrader_strategy(self.params)
 
 
 # 注册策略

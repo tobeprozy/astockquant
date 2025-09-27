@@ -24,11 +24,11 @@ def main():
         symbol='600000',  # 茅台股票代码
         start_date='2024-01-01',
         end_date='2024-12-31',
-        strategy_name='VolatilityBreakout',  # 使用qstrategy中的波动率突破策略
+        strategy_name='volatility_breakout',  # 使用正确的策略名称
         starting_cash=100000.0,
         commission=0.00025, # 佣金
         strategy_kwargs={
-            'period': 20,  # 波动率计算周期
+            'window': 20,  # 波动率计算周期（与策略参数名一致）
             'multiplier': 2.0,  # 波动率乘数
             'printlog': True  # 打印交易日志
         }

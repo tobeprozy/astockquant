@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Any, Tuple
 import logging
+import backtrader as bt  # 添加backtrader导入
 
 from qstrategy.core.strategy import Strategy
 from qstrategy.backends import register_strategy
@@ -23,6 +24,14 @@ class PairTradingStrategy(Strategy):
     当两只相关性高的股票之间的价格差异超过阈值时进行交易
     """
     
+    # 直接在类级别定义默认参数
+    default_params = {
+        'lookback_period': 60,
+        'zscore_threshold': 2,
+        'printlog': False,
+        'size': 100
+    }
+    
     def __init__(self, **kwargs):
         """
         初始化策略
@@ -34,18 +43,11 @@ class PairTradingStrategy(Strategy):
                 printlog: 是否打印日志，默认False
                 size: 交易数量（股），默认100
         """
-        # 设置默认参数
-        default_params = {
-            'lookback_period': 60,
-            'zscore_threshold': 2,
-            'printlog': False,
-            'size': 100
-        }
-        
         # 合并用户参数和默认参数
-        default_params.update(kwargs)
+        merged_params = PairTradingStrategy.default_params.copy()
+        merged_params.update(kwargs)
         
-        super().__init__(**default_params)
+        super().__init__(**merged_params)
         
         # 初始化指标
         self._stock1_data = None
@@ -53,6 +55,118 @@ class PairTradingStrategy(Strategy):
         self._spread = None
         self._zscore = None
         self._indicators_data = None
+    
+    def get_backtrader_strategy(self):
+        """
+        获取兼容backtrader的策略类
+        使策略能在BacktraderEngine中运行
+        """
+        class BacktraderPairTradingStrategy(bt.Strategy):
+            # 使用类级别默认参数
+            params = tuple((k, v) for k, v in PairTradingStrategy.default_params.items())
+            
+            def __init__(self):
+                # 初始化交易状态
+                self.order = None
+                self.buyprice = None
+                self.buycomm = None
+                
+                # 获取两只股票的数据源
+                self.stock1 = self.datas[0]
+                self.stock2 = self.datas[1]
+                
+                # 计算价差
+                self.spread = self.stock1.close - self.stock2.close
+                
+                # 计算滚动均值和标准差用于Z-score计算
+                self.lookback_period = self.p.lookback_period
+                
+                # 用于存储历史价差数据
+                self.spread_history = []
+                
+                # 交易状态跟踪
+                self.in_position = False
+            
+            def log(self, txt, dt=None):
+                """记录交易日志"""
+                dt = dt or self.datas[0].datetime.date(0)
+                print(f'{dt.isoformat()} {txt}')
+            
+            def notify_order(self, order):
+                """订单状态变化通知"""
+                if order.status in [order.Submitted, order.Accepted]:
+                    # 订单已提交或已接受，无需操作
+                    return
+                
+                # 检查订单是否完成
+                if order.status in [order.Completed]:
+                    if order.isbuy():  # 买入订单完成
+                        self.log(f'买入: 价格={order.executed.price:.2f}, 数量={order.executed.size}')
+                        self.buyprice = order.executed.price
+                        self.buycomm = order.executed.comm
+                    else:  # 卖出订单完成
+                        self.log(f'卖出: 价格={order.executed.price:.2f}, 数量={order.executed.size}')
+                elif order.status in [order.Canceled, order.Margin, order.Rejected]:
+                    self.log('订单 取消/保证金不足/拒绝')
+                
+                # 重置订单状态
+                self.order = None
+            
+            def notify_trade(self, trade):
+                """交易状态变化通知"""
+                if not trade.isclosed:
+                    return
+                
+                self.log(f'交易利润: 毛利润={trade.pnl:.2f}, 净利润={trade.pnlcomm:.2f}')
+            
+            def next(self):
+                """每个交易日执行的逻辑"""
+                # 检查是否有挂单
+                if self.order:
+                    return
+                
+                # 添加当前价差到历史记录
+                current_spread = self.spread[0]
+                self.spread_history.append(current_spread)
+                
+                # 确保有足够的历史数据计算Z-score
+                if len(self.spread_history) < self.p.lookback_period:
+                    return
+                
+                # 计算Z-score
+                recent_spreads = self.spread_history[-self.p.lookback_period:]
+                mean = np.mean(recent_spreads)
+                std = np.std(recent_spreads)
+                
+                # 避免除零错误
+                if std == 0:
+                    zscore = 0
+                else:
+                    zscore = (current_spread - mean) / std
+                
+                # 交易逻辑
+                if not self.in_position:
+                    # 当Z-score低于负阈值时，买入股票1卖出股票2
+                    if zscore < -self.p.zscore_threshold:
+                        if self.p.printlog:
+                            self.log(f"买入股票1卖出股票2信号: Z-score={zscore:.2f}")
+                        # 买入股票1
+                        self.buy(data=self.stock1, size=self.p.size)
+                        # 卖出股票2
+                        self.sell(data=self.stock2, size=self.p.size)
+                        self.in_position = True
+                else:
+                    # 当Z-score高于正阈值时，卖出股票1买入股票2（平仓）
+                    if zscore > self.p.zscore_threshold:
+                        if self.p.printlog:
+                            self.log(f"卖出股票1买入股票2信号: Z-score={zscore:.2f}")
+                        # 卖出股票1
+                        self.sell(data=self.stock1, size=self.p.size)
+                        # 买入股票2
+                        self.buy(data=self.stock2, size=self.p.size)
+                        self.in_position = False
+        
+        return BacktraderPairTradingStrategy
     
     def init_data(self, data: Dict[str, pd.DataFrame]) -> None:
         """

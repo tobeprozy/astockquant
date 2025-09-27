@@ -9,6 +9,7 @@
 import pandas as pd
 from typing import Dict, Any
 import logging
+import backtrader as bt  # 添加backtrader导入
 
 from qstrategy.core.strategy import Strategy
 from qstrategy.backends import register_strategy
@@ -233,7 +234,97 @@ class BBANDSStrategy(Strategy):
             self.log(f"交易结果: 总利润={total_profit:.2f}, 交易次数={len(trades)}")
         
         return result
-
+    
+    def get_backtrader_strategy(self):
+        """
+        获取兼容backtrader的策略类
+        该方法使策略能够在BacktraderEngine中运行
+        """
+        # 获取当前策略的参数
+        params = self.params.copy()
+        
+        # 定义backtrader策略类
+        class BacktraderBBANDSStrategy(bt.Strategy):
+            # 设置参数
+            params = (
+                ('timeperiod', params.get('timeperiod', 20)),
+                ('nbdevup', params.get('nbdevup', 2)),
+                ('nbdevdn', params.get('nbdevdn', 2)),
+                ('printlog', params.get('printlog', False)),
+                ('size', params.get('size', 100))
+            )
+            
+            def __init__(self):
+                # 初始化布林带指标
+                self.bbands = bt.indicators.BollingerBands(
+                    self.data.close,
+                    period=self.p.timeperiod,
+                    devfactor=self.p.nbdevup
+                )
+                
+                # 跟踪交易状态
+                self.order = None
+                self.buyprice = None
+                self.buycomm = None
+            
+            def log(self, txt, dt=None, doprint=False):
+                """日志函数"""
+                if self.p.printlog or doprint:
+                    dt = dt or self.datas[0].datetime.date(0)
+                    print(f'{dt.isoformat()} {txt}')
+            
+            def notify_order(self, order):
+                """订单状态通知"""
+                # ... 与MACDJKStrategy中的实现相同 ...
+                if order.status in [order.Submitted, order.Accepted]:
+                    return
+                
+                if order.status in [order.Completed]:
+                    if order.isbuy():
+                        self.log(f'买入: 价格={order.executed.price:.2f}, '
+                                f'成本={order.executed.value:.2f}, '
+                                f'佣金={order.executed.comm:.2f}')
+                        self.buyprice = order.executed.price
+                        self.buycomm = order.executed.comm
+                    else:  # 卖出
+                        self.log(f'卖出: 价格={order.executed.price:.2f}, '
+                                f'收入={order.executed.value:.2f}, '
+                                f'佣金={order.executed.comm:.2f}')
+                    
+                    self.bar_executed = len(self)
+                    
+                elif order.status in [order.Canceled, order.Margin, order.Rejected]:
+                    self.log('订单取消/保证金不足/拒绝')
+                    
+                self.order = None
+            
+            def notify_trade(self, trade):
+                """交易状态通知"""
+                # ... 与MACDJKStrategy中的实现相同 ...
+                if not trade.isclosed:
+                    return
+                
+                self.log(f'交易利润: 毛利润={trade.pnl:.2f}, 净利润={trade.pnlcomm:.2f}')
+            
+            def next(self):
+                """每个交易周期执行一次"""
+                # 检查是否有订单在处理中
+                if self.order:
+                    return
+                
+                # 买入信号: 价格触及下轨
+                if self.data.close[0] <= self.bbands.lines.bot[0]:
+                    self.log(f'买入信号: 价格={self.data.close[0]:.2f}, 下轨={self.bbands.lines.bot[0]:.2f}')
+                    if not self.position:
+                        self.order = self.buy(size=self.p.size)
+                
+                # 卖出信号: 价格触及上轨
+                elif self.data.close[0] >= self.bbands.lines.top[0]:
+                    self.log(f'卖出信号: 价格={self.data.close[0]:.2f}, 上轨={self.bbands.lines.top[0]:.2f}')
+                    if self.position:
+                        self.order = self.sell(size=self.p.size)
+        
+        return BacktraderBBANDSStrategy
 
 # 注册策略
 register_strategy('bbands', BBANDSStrategy)

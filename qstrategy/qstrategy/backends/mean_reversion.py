@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Any
 import logging
+import backtrader as bt  # 添加backtrader导入
 
 from qstrategy.core.strategy import Strategy
 from qstrategy.backends import register_strategy
@@ -23,6 +24,14 @@ class MeanReversionStrategy(Strategy):
     当价格偏离均值超过一定阈值时，预期价格会回归均值，从而产生交易信号
     """
     
+    # 直接在类级别定义默认参数
+    default_params = {
+        'lookback_period': 20,
+        'std_dev_threshold': 2,
+        'printlog': False,
+        'size': 100
+    }
+    
     def __init__(self, **kwargs):
         """
         初始化策略
@@ -34,18 +43,11 @@ class MeanReversionStrategy(Strategy):
                 printlog: 是否打印日志，默认False
                 size: 交易数量（股），默认100
         """
-        # 设置默认参数
-        default_params = {
-            'lookback_period': 20,
-            'std_dev_threshold': 2,
-            'printlog': False,
-            'size': 100
-        }
-        
         # 合并用户参数和默认参数
-        default_params.update(kwargs)
+        merged_params = MeanReversionStrategy.default_params.copy()
+        merged_params.update(kwargs)
         
-        super().__init__(**default_params)
+        super().__init__(**merged_params)
         
         # 初始化指标
         self._rolling_mean = None
@@ -54,7 +56,94 @@ class MeanReversionStrategy(Strategy):
         self._upper_band = None
         self._lower_band = None
         self._indicators_data = None
-    
+        
+    def get_backtrader_strategy(self):
+        """
+        获取兼容backtrader的策略类
+        使策略能在BacktraderEngine中运行
+        """
+        class BacktraderMeanReversionStrategy(bt.Strategy):
+            # 使用类级别默认参数
+            params = tuple((k, v) for k, v in MeanReversionStrategy.default_params.items())
+            
+            def __init__(self):
+                # 初始化交易状态
+                self.order = None
+                self.buyprice = None
+                self.buycomm = None
+                
+                # 计算滚动均值和标准差
+                self.rolling_mean = bt.indicators.SimpleMovingAverage(
+                    self.data.close, period=self.p.lookback_period
+                )
+                self.rolling_std = bt.indicators.StandardDeviation(
+                    self.data.close, period=self.p.lookback_period
+                )
+                
+                # 计算Z-score
+                self.zscore = (self.data.close - self.rolling_mean) / self.rolling_std
+                
+                # 计算上下边界
+                self.upper_band = self.rolling_mean + (self.rolling_std * self.p.std_dev_threshold)
+                self.lower_band = self.rolling_mean - (self.rolling_std * self.p.std_dev_threshold)
+            
+            def log(self, txt, dt=None):
+                """记录交易日志"""
+                dt = dt or self.datas[0].datetime.date(0)
+                print(f'{dt.isoformat()} {txt}')
+            
+            def notify_order(self, order):
+                """订单状态变化通知"""
+                if order.status in [order.Submitted, order.Accepted]:
+                    # 订单已提交或已接受，无需操作
+                    return
+                
+                # 检查订单是否完成
+                if order.status in [order.Completed]:
+                    if order.isbuy():  # 买入订单完成
+                        self.log(f'买入: 价格={order.executed.price:.2f}, 数量={order.executed.size}')
+                        self.buyprice = order.executed.price
+                        self.buycomm = order.executed.comm
+                    else:  # 卖出订单完成
+                        self.log(f'卖出: 价格={order.executed.price:.2f}, 数量={order.executed.size}')
+                elif order.status in [order.Canceled, order.Margin, order.Rejected]:
+                    self.log('订单 取消/保证金不足/拒绝')
+                
+                # 重置订单状态
+                self.order = None
+            
+            def notify_trade(self, trade):
+                """交易状态变化通知"""
+                if not trade.isclosed:
+                    return
+                
+                self.log(f'交易利润: 毛利润={trade.pnl:.2f}, 净利润={trade.pnlcomm:.2f}')
+            
+            def next(self):
+                """每个交易日执行的逻辑"""
+                # 检查是否有挂单
+                if self.order:
+                    return
+                
+                # 获取Z-score值
+                zscore_value = self.zscore[0]
+                
+                # 确保Z-score值不为NaN
+                if not np.isnan(zscore_value):
+                    # 当Z-score低于负阈值时，买入（预期价格会回归均值）
+                    if zscore_value < -self.p.std_dev_threshold and not self.position:
+                        if self.p.printlog:
+                            self.log(f"均值回归买入信号: Z-score={zscore_value:.2f}, 价格: {self.data.close[0]:.2f}")
+                        self.order = self.buy(size=self.p.size)
+                    
+                    # 当Z-score高于正阈值时，卖出（预期价格会回归均值）
+                    elif zscore_value > self.p.std_dev_threshold and self.position:
+                        if self.p.printlog:
+                            self.log(f"均值回归卖出信号: Z-score={zscore_value:.2f}, 价格: {self.data.close[0]:.2f}")
+                        self.order = self.sell(size=self.p.size)
+        
+        return BacktraderMeanReversionStrategy
+
     def calculate_indicators(self) -> pd.DataFrame:
         """
         计算均值回归所需的指标
